@@ -10,8 +10,9 @@ let paused = false;
 let lastTime = 0;
 
 const ATTACK_INTERVAL = 600; // ms
-const SPEED = 1.5; // 実際の見た目速度（調整済）
+const SPEED = 1.5;
 
+// ===== 初期化 =====
 function createUnits() {
   units = [];
 
@@ -46,13 +47,13 @@ function createUnits() {
   }
 }
 
+// ===== ユーティリティ =====
 function distance(a, b) {
   return Math.hypot(a.x - b.x, a.y - b.y);
 }
 
 function findTarget(unit) {
   let enemies = units.filter(u => u.team !== unit.team && u.hp > 0);
-
   if (enemies.length === 0) return null;
 
   let nearest = enemies[0];
@@ -69,6 +70,7 @@ function findTarget(unit) {
   return nearest;
 }
 
+// ===== 更新（仮想時間ベース）=====
 function update(delta) {
   for (let unit of units) {
     if (unit.hp <= 0) continue;
@@ -78,15 +80,17 @@ function update(delta) {
 
     let dist = distance(unit, target);
 
-    // 射程内なら攻撃
     if (dist <= unit.range) {
       unit.state = "attack";
 
-      if (Date.now() - unit.lastAttack > ATTACK_INTERVAL) {
-        unit.lastAttack = Date.now();
+      // 仮想時間で攻撃管理
+      unit.lastAttack += delta;
+
+      if (unit.lastAttack >= ATTACK_INTERVAL) {
+        unit.lastAttack = 0;
 
         // 10%ミス
-        if (Math.random() < 0.1) return;
+        if (Math.random() < 0.1) continue;
 
         target.hp -= 2;
       }
@@ -94,19 +98,21 @@ function update(delta) {
     } else {
       unit.state = "move";
 
-      // 移動
       let dx = target.x - unit.x;
       let dy = target.y - unit.y;
       let len = Math.hypot(dx, dy);
 
-      unit.x += (dx / len) * SPEED;
-      unit.y += (dy / len) * SPEED;
+      if (len > 0) {
+        unit.x += (dx / len) * SPEED;
+        unit.y += (dy / len) * SPEED;
+      }
     }
   }
 
   checkWin();
 }
 
+// ===== 勝敗 =====
 function checkWin() {
   let redAlive = units.some(u => u.team === "red" && u.hp > 0);
   let blueAlive = units.some(u => u.team === "blue" && u.hp > 0);
@@ -119,6 +125,7 @@ function checkWin() {
   }
 }
 
+// ===== 描画 =====
 function draw() {
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
@@ -130,18 +137,20 @@ function draw() {
     ctx.fillStyle = unit.team === "red" ? "red" : "blue";
     ctx.fill();
 
-    // HP表示（簡易）
+    // HP表示
     ctx.fillStyle = "white";
     ctx.font = "10px sans-serif";
     ctx.fillText(unit.hp, unit.x - 6, unit.y - 10);
   }
 }
 
+// ===== メインループ =====
 function loop(timestamp) {
   if (!running) return;
 
   if (!paused) {
-    update(timestamp - lastTime);
+    let delta = timestamp - lastTime;
+    update(delta);
     draw();
   }
 
@@ -149,13 +158,13 @@ function loop(timestamp) {
   requestAnimationFrame(loop);
 }
 
-// ===== ボタン操作 =====
-
+// ===== 操作 =====
 function startGame() {
   createUnits();
   document.getElementById("result").textContent = "";
   running = true;
   paused = false;
+  lastTime = performance.now();
   requestAnimationFrame(loop);
 }
 
@@ -163,9 +172,12 @@ function togglePause() {
   paused = !paused;
 }
 
+// 🚀 超高速スキップ（修正版）
 function skipGame() {
-  // 超高速シミュレーション
-  while (running) {
-    update(16);
+  let safety = 0;
+
+  while (running && safety < 100000) {
+    update(50); // 大きめdeltaで高速化
+    safety++;
   }
 }
