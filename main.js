@@ -15,65 +15,33 @@ function toCanvasY(y) {
 // ===== ダメージ倍率 =====
 function getMultiplier(atk, def) {
   const table = {
-    "ドカン": {
-      "かるーい": 2,
-      "おもーい": 1,
-      "まぜまぜ": 1,
-      "ふしぎー": 0.5,
-      "もちもち": 0.5
-    },
-    "ズバッ": {
-      "かるーい": 0.5,
-      "おもーい": 2,
-      "まぜまぜ": 1,
-      "ふしぎー": 1,
-      "もちもち": 1
-    },
-    "バラバラ": {
-      "かるーい": 0.5,
-      "おもーい": 1.5,
-      "まぜまぜ": 2,
-      "ふしぎー": 1,
-      "もちもち": 1
-    },
-    "グルル": {
-      "かるーい": 1,
-      "おもーい": 0.5,
-      "まぜまぜ": 0.5,
-      "ふしぎー": 2,
-      "もちもち": 1
-    },
-    "ブルブル": {
-      "かるーい": 1,
-      "おもーい": 0.5,
-      "まぜまぜ": 0.5,
-      "ふしぎー": 1.5,
-      "もちもち": 2
-    }
+    "ドカン": { "かるーい": 2, "おもーい": 1, "まぜまぜ": 1, "ふしぎー": 0.5, "もちもち": 0.5 },
+    "ズバッ": { "かるーい": 0.5, "おもーい": 2, "まぜまぜ": 1, "ふしぎー": 1, "もちもち": 1 },
+    "バラバラ": { "かるーい": 0.5, "おもーい": 1.5, "まぜまぜ": 2, "ふしぎー": 1, "もちもち": 1 },
+    "グルル": { "かるーい": 1, "おもーい": 0.5, "まぜまぜ": 0.5, "ふしぎー": 2, "もちもち": 1 },
+    "ブルブル": { "かるーい": 1, "おもーい": 0.5, "まぜまぜ": 0.5, "ふしぎー": 1.5, "もちもち": 2 }
   };
-
   return table[atk]?.[def] ?? 1;
 }
 
-// ===== ユニット =====
-const units = [];
+// ===== テンプレート =====
+const templates = [];
 
-function initUnits() {
-  units.length = 0;
+// 初期テンプレート作成
+function initTemplates() {
+  templates.length = 0;
 
   const spacing = 60;
 
   // 赤
   for (let i = 0; i < 4; i++) {
-    units.push({
+    templates.push({
       team: "red",
       x: -300,
       y: (i - 1.5) * spacing,
       speed: 2,
       range: 120,
       hp: 20,
-      alive: true,
-      lastAttack: 0,
       attackType: "ドカン",
       defenseType: "かるーい"
     });
@@ -81,19 +49,28 @@ function initUnits() {
 
   // 青
   for (let i = 0; i < 4; i++) {
-    units.push({
+    templates.push({
       team: "blue",
       x: 300,
       y: (i - 1.5) * spacing,
       speed: 2,
       range: 120,
       hp: 20,
-      alive: true,
-      lastAttack: 0,
       attackType: "ズバッ",
       defenseType: "おもーい"
     });
   }
+}
+
+// ===== 実体ユニット =====
+let units = [];
+
+function initUnits() {
+  units = templates.map(t => ({
+    ...t,
+    alive: true,
+    lastAttack: 0
+  }));
 }
 
 // ===== 最も近い敵 =====
@@ -131,22 +108,18 @@ function update() {
     const dy = target.y - u.y;
     const dist = Math.hypot(dx, dy);
 
-    // 射程外 → 移動
     if (dist > u.range) {
       u.x += (dx / dist) * u.speed;
       u.y += (dy / dist) * u.speed;
-    } 
-    // 射程内 → 攻撃
-    else {
+    } else {
       if (now - u.lastAttack > 600) {
         u.lastAttack = now;
 
         let damage = 0;
 
-        // 90%命中
         if (Math.random() > 0.1) {
-          const multiplier = getMultiplier(u.attackType, target.defenseType);
-          damage = 2 * multiplier;
+          const mult = getMultiplier(u.attackType, target.defenseType);
+          damage = 2 * mult;
         }
 
         target.hp -= damage;
@@ -171,14 +144,9 @@ function draw() {
     ctx.fillStyle = u.team === "red" ? "red" : "blue";
     ctx.fill();
 
-    // HP表示
     ctx.fillStyle = "black";
     ctx.font = "10px sans-serif";
-    ctx.fillText(
-      Math.round(u.hp),
-      toCanvasX(u.x) - 6,
-      toCanvasY(u.y) - 10
-    );
+    ctx.fillText(Math.round(u.hp), toCanvasX(u.x) - 6, toCanvasY(u.y) - 10);
   }
 }
 
@@ -190,6 +158,6 @@ function loop() {
 }
 
 // ===== 実行 =====
+initTemplates();
 initUnits();
-draw();
 loop();
