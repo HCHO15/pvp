@@ -12,6 +12,49 @@ function toCanvasY(y) {
   return canvas.height / 2 - y;
 }
 
+// ===== ダメージ倍率 =====
+function getMultiplier(atk, def) {
+  const table = {
+    "ドカン": {
+      "かるーい": 2,
+      "おもーい": 1,
+      "まぜまぜ": 1,
+      "ふしぎー": 0.5,
+      "もちもち": 0.5
+    },
+    "ズバッ": {
+      "かるーい": 0.5,
+      "おもーい": 2,
+      "まぜまぜ": 1,
+      "ふしぎー": 1,
+      "もちもち": 1
+    },
+    "バラバラ": {
+      "かるーい": 0.5,
+      "おもーい": 1.5,
+      "まぜまぜ": 2,
+      "ふしぎー": 1,
+      "もちもち": 1
+    },
+    "グルル": {
+      "かるーい": 1,
+      "おもーい": 0.5,
+      "まぜまぜ": 0.5,
+      "ふしぎー": 2,
+      "もちもち": 1
+    },
+    "ブルブル": {
+      "かるーい": 1,
+      "おもーい": 0.5,
+      "まぜまぜ": 0.5,
+      "ふしぎー": 1.5,
+      "もちもち": 2
+    }
+  };
+
+  return table[atk]?.[def] ?? 1;
+}
+
 // ===== ユニット =====
 const units = [];
 
@@ -20,6 +63,7 @@ function initUnits() {
 
   const spacing = 60;
 
+  // 赤
   for (let i = 0; i < 4; i++) {
     units.push({
       team: "red",
@@ -29,10 +73,13 @@ function initUnits() {
       range: 120,
       hp: 20,
       alive: true,
-      lastAttack: 0
+      lastAttack: 0,
+      attackType: "ドカン",
+      defenseType: "かるーい"
     });
   }
 
+  // 青
   for (let i = 0; i < 4; i++) {
     units.push({
       team: "blue",
@@ -42,7 +89,9 @@ function initUnits() {
       range: 120,
       hp: 20,
       alive: true,
-      lastAttack: 0
+      lastAttack: 0,
+      attackType: "ズバッ",
+      defenseType: "おもーい"
     });
   }
 }
@@ -82,21 +131,22 @@ function update() {
     const dy = target.y - u.y;
     const dist = Math.hypot(dx, dy);
 
-    // ★ 射程外 → 移動
+    // 射程外 → 移動
     if (dist > u.range) {
       u.x += (dx / dist) * u.speed;
       u.y += (dy / dist) * u.speed;
     } 
-    // ★ 射程内 → 攻撃
+    // 射程内 → 攻撃
     else {
       if (now - u.lastAttack > 600) {
         u.lastAttack = now;
 
         let damage = 0;
 
-        // 90%で命中
+        // 90%命中
         if (Math.random() > 0.1) {
-          damage = 2;
+          const multiplier = getMultiplier(u.attackType, target.defenseType);
+          damage = 2 * multiplier;
         }
 
         target.hp -= damage;
@@ -121,10 +171,14 @@ function draw() {
     ctx.fillStyle = u.team === "red" ? "red" : "blue";
     ctx.fill();
 
-    // HP表示（簡易）
+    // HP表示
     ctx.fillStyle = "black";
     ctx.font = "10px sans-serif";
-    ctx.fillText(u.hp, toCanvasX(u.x) - 5, toCanvasY(u.y) - 10);
+    ctx.fillText(
+      Math.round(u.hp),
+      toCanvasX(u.x) - 6,
+      toCanvasY(u.y) - 10
+    );
   }
 }
 
