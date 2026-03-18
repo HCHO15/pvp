@@ -15,10 +15,10 @@ const ATTACK_INTERVAL = 600;
 const SPEED = 1.5;
 
 let units = [];
-let openState = {}; // 折りたたみ保持
+let openState = {};
 
 // ======================
-// Unitクラス
+// Unit
 // ======================
 class Unit {
   constructor(id, team, x, y) {
@@ -68,7 +68,6 @@ class Unit {
   update(units, time) {
     if (!this.alive) return;
 
-    // HPによる状態同期
     if (this.hp <= 0) {
       this.alive = false;
       return;
@@ -76,33 +75,27 @@ class Unit {
       this.alive = true;
     }
 
-    // 毎フレームターゲット更新
     this.target = this.findClosestEnemy(units);
     if (!this.target) return;
 
     const dist = this.distanceTo(this.target);
 
-    // 射程外 → 移動
     if (dist > this.range) {
       this.inRangeSince = null;
       this.moveToward(this.target);
       return;
     }
 
-    // 射程内
     if (this.inRangeSince === null) {
       this.inRangeSince = time;
       return;
     }
 
-    // 攻撃待機
     if (time - this.inRangeSince < ATTACK_INTERVAL) return;
-
     if (time - this.lastAttack < ATTACK_INTERVAL) return;
 
     this.lastAttack = time;
 
-    // ミス
     if (Math.random() < 0.1) return;
 
     let damage = 2 * getMultiplier(this.attackType, this.target.defenseType);
@@ -118,13 +111,11 @@ class Unit {
   draw() {
     if (!this.alive) return;
 
-    // 本体
     ctx.beginPath();
     ctx.arc(this.x, this.y, 6, 0, Math.PI * 2);
     ctx.fillStyle = this.team === "red" ? "red" : "blue";
     ctx.fill();
 
-    // HPバー
     const barWidth = 20;
     const hpRatio = this.hp / this.maxHp;
 
@@ -136,8 +127,6 @@ class Unit {
   }
 }
 
-// ======================
-// ダメージ倍率
 // ======================
 function getMultiplier(atk, def) {
   const table = {
@@ -151,8 +140,6 @@ function getMultiplier(atk, def) {
 }
 
 // ======================
-// 初期化（1回のみ）
-// ======================
 function initUnits() {
   if (initialized) return;
   initialized = true;
@@ -164,15 +151,11 @@ function initUnits() {
 }
 
 // ======================
-// 描画
-// ======================
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   units.forEach(u => u.draw());
 }
 
-// ======================
-// ループ
 // ======================
 function loop(time) {
   if (!running) return;
@@ -188,22 +171,16 @@ function loop(time) {
 }
 
 // ======================
-// 勝敗
-// ======================
 function checkWin() {
   let redAlive = units.some(u => u.team === "red" && u.alive);
   let blueAlive = units.some(u => u.team === "blue" && u.alive);
 
   if (!redAlive || !blueAlive) {
     running = false;
-    setTimeout(() => {
-      alert(redAlive ? "赤の勝ち！" : "青の勝ち！");
-    }, 50);
+    alert(redAlive ? "赤の勝ち！" : "青の勝ち！");
   }
 }
 
-// ======================
-// UI
 // ======================
 document.getElementById("startBtn").onclick = () => {
   if (!running) {
@@ -226,8 +203,6 @@ document.getElementById("skipBtn").onclick = () => {
 };
 
 // ======================
-// パネルUI
-// ======================
 function renderPanel() {
   const list = document.getElementById("entityList");
   list.innerHTML = "";
@@ -242,26 +217,12 @@ function renderPanel() {
 
     const body = document.createElement("div");
     body.className = "entity-body";
-
-    // 折りたたみ状態復元
     body.style.display = openState[u.id] ? "block" : "none";
-
-    const createSelect = (options, value, onChange) => {
-      const select = document.createElement("select");
-      options.forEach(opt => {
-        const o = document.createElement("option");
-        o.value = opt;
-        o.textContent = opt;
-        if (String(opt) === String(value)) o.selected = true;
-        select.appendChild(o);
-      });
-      select.onchange = () => onChange(select.value);
-      return select;
-    };
 
     const container = document.createElement("div");
 
     // X
+    const xLabel = document.createTextNode("x:");
     const xInput = document.createElement("input");
     xInput.type = "number";
     xInput.value = Math.round(u.x - CENTER_X);
@@ -269,7 +230,12 @@ function renderPanel() {
       u.x = Number(xInput.value) + CENTER_X;
     };
 
+    container.appendChild(xLabel);
+    container.appendChild(xInput);
+    container.appendChild(document.createElement("br"));
+
     // Y
+    const yLabel = document.createTextNode("y:");
     const yInput = document.createElement("input");
     yInput.type = "number";
     yInput.value = Math.round(u.y - CENTER_Y);
@@ -277,48 +243,9 @@ function renderPanel() {
       u.y = Number(yInput.value) + CENTER_Y;
     };
 
-    container.append("x:", xInput, document.createElement("br"));
-    container.append("y:", yInput, document.createElement("br"));
-
-    // 射程
-    const rangeOptions = [];
-    for (let i = 350; i <= 800; i += 50) rangeOptions.push(i);
-
-    container.append("射程:");
-    container.append(createSelect(rangeOptions, u.range, v => {
-      u.range = Number(v);
-      u.inRangeSince = null;
-    }));
-    container.append(document.createElement("br"));
-
-    // HP
-    const hpOptions = [];
-    for (let i = 10; i <= 50; i++) hpOptions.push(i);
-
-    container.append("HP:");
-    container.append(createSelect(hpOptions, u.hp, v => {
-      u.hp = Number(v);
-      u.maxHp = Number(v);
-      if (u.hp > 0) u.alive = true;
-    }));
-    container.append(document.createElement("br"));
-
-    // 攻撃
-    container.append("攻撃:");
-    container.append(createSelect(
-      ["ドカン", "ズバッ", "グルル", "ブルブル", "バラバラ"],
-      u.attackType,
-      v => u.attackType = v
-    ));
-    container.append(document.createElement("br"));
-
-    // 防御
-    container.append("防御:");
-    container.append(createSelect(
-      ["かるーい", "おもーい", "ふしぎー", "もちもち", "まぜまぜ"],
-      u.defenseType,
-      v => u.defenseType = v
-    ));
+    container.appendChild(yLabel);
+    container.appendChild(yInput);
+    container.appendChild(document.createElement("br"));
 
     body.appendChild(container);
 
@@ -333,8 +260,6 @@ function renderPanel() {
   });
 }
 
-// ======================
-// 初期実行
 // ======================
 initUnits();
 renderPanel();
