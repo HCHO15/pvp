@@ -8,7 +8,7 @@ body { display:flex; font-family:sans-serif; }
 #left { width:70%; }
 #right { width:30%; height:95vh; overflow:auto; }
 canvas { border:1px solid black; }
-.unitBox { border:1px solid #aaa; margin:5px; padding:5px; }
+.box { border:1px solid #aaa; margin:5px; padding:5px; }
 </style>
 </head>
 <body>
@@ -31,96 +31,61 @@ canvas { border:1px solid black; }
 <script>
 const ctx = canvas.getContext("2d");
 
-let units=[], bullets=[], popups=[];
-let savedData=[];
-let running=false, paused=false, fast=false;
+let units=[], bullets=[], popups=[], obstacles=[];
+let savedData=[], savedObs=[];
 
-const RANGE_OPTIONS = [350,450,550,650,750,850];
+const HARDNESS_HP = {"柔らかい":2,"硬い":7,"とても硬い":13};
+const RANGE_OPTIONS=[350,450,550,650,750,850];
 
-const defaultData = () => ({
- range:400, hp:30, attack:"ドカン",
- defense:"かるーい", weapon:"なし", cover:"使わない"
-});
-
-const damageTable = {
- "ドカン":{"かるーい":2,"おもーい":1,"まぜまぜ":1,"ふしぎー":0.5,"もちもち":0.5},
- "ズバッ":{"かるーい":0.5,"おもーい":2,"まぜまぜ":1,"ふしぎー":1,"もちもち":1},
- "バラバラ":{"かるーい":0.5,"おもーい":1.5,"まぜまぜ":2,"ふしぎー":1,"もちもち":1},
- "グルル":{"かるーい":1,"おもーい":0.5,"まぜまぜ":0.5,"ふしぎー":2,"もちもち":1},
- "ブルブル":{"かるーい":1,"おもーい":0.5,"まぜまぜ":0.5,"ふしぎー":1.5,"もちもち":2}
-};
+class Obstacle{
+ constructor(x,y,data){
+  this.x=x; this.y=y;
+  this.active=data.active;
+  this.radius=data.radius;
+  this.hp=HARDNESS_HP[data.hardness];
+  this.hardness=data.hardness;
+ }
+}
 
 class Unit{
  constructor(team,x,y,id,data){
-  this.team=team;
-  this.id=id;
+  this.team=team; this.id=id;
   this.x=x; this.y=y;
-
-  this.displayRange=data.range;
-  this.range=data.range * 0.75;
-
-  this.hp=data.hp;
-  this.maxHp=data.hp;
-
+  this.range=data.range*0.75;
+  this.hp=data.hp; this.maxHp=data.hp;
   this.attack=data.attack;
   this.defense=data.defense;
-  this.weapon=data.weapon;
-  this.cover=data.cover;
-
   this.lastAttack=0;
   this.dead=false;
+ }
+}
+
+function createObstacles(){
+ obstacles=[];
+ for(let i=0;i<5;i++){
+  let d=savedObs[i]||{active:false,radius:20,hardness:"硬い"};
+  obstacles.push(new Obstacle(350,80*i+50,d));
  }
 }
 
 function createUnits(){
  units=[];
  for(let i=0;i<4;i++){
-  let data = savedData[i] || defaultData();
-  units.push(new Unit("red",50,80*i+50,i+1,data));
+  let d=savedData[i]||{range:400,hp:30,attack:"ドカン",defense:"かるーい"};
+  units.push(new Unit("red",50,80*i+50,i+1,d));
  }
  for(let i=0;i<4;i++){
-  let data = savedData[i+4] || defaultData();
-  units.push(new Unit("blue",650,80*i+50,i+1,data));
+  let d=savedData[i+4]||{range:400,hp:30,attack:"ドカン",defense:"かるーい"};
+  units.push(new Unit("blue",650,80*i+50,i+1,d));
  }
-}
-
-function saveStatus(){
- savedData=[];
- for(let i=0;i<8;i++){
-  let team=i<4?"red":"blue";
-  let id=i<4?i+1:i-3;
-
-  savedData.push({
-   range:Number(document.getElementById(`range${team}${id}`).value),
-   hp:Number(document.getElementById(`hp${team}${id}`).value),
-   attack:document.getElementById(`atk${team}${id}`).value,
-   defense:document.getElementById(`def${team}${id}`).value,
-   weapon:document.getElementById(`wp${team}${id}`).value,
-   cover:document.getElementById(`cv${team}${id}`).value
-  });
- }
- alert("保存しました");
-}
-
-function resetStatus(){
- savedData=[];
- buildUI();
- alert("リセットしました");
 }
 
 function start(){
- running=true;
- paused=false;
- fast=false;
- bullets=[];
- popups=[];
- document.getElementById("winner").innerText="";
+ bullets=[]; popups=[];
  createUnits();
+ createObstacles();
  loop();
 }
-
-function pause(){paused=!paused;}
-function skip(){fast=true;}
 
 function distance(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
 
@@ -130,187 +95,151 @@ function update(){
   if(u.dead) continue;
 
   let enemies=units.filter(e=>e.team!==u.team && !e.dead);
-  if(enemies.length===0){endGame(u.team);return;}
+  if(enemies.length===0){return;}
 
-  let inRange=enemies.filter(e=>distance(u,e)<=u.range);
+  let target=enemies.sort((a,b)=>distance(u,a)-distance(u,b))[0];
 
-  if(inRange.length>0){
-   let t=inRange.sort((a,b)=>distance(u,a)-distance(u,b))[0];
+  let d=distance(u,target);
 
-   if(performance.now()-u.lastAttack>600){
-    u.lastAttack=performance.now();
+  if(d<=u.range){
+    if(performance.now()-u.lastAttack>600){
+      u.lastAttack=performance.now();
 
-    let dx=t.x-u.x, dy=t.y-u.y;
+      let dx=(target.x-u.x)/d;
+      let dy=(target.y-u.y)/d;
+
+      bullets.push({x:u.x,y:u.y,dx,dy,owner:u,startX:u.x,startY:u.y});
+    }
+  }else{
+
+    let dx=target.x-u.x;
+    let dy=target.y-u.y;
     let len=Math.hypot(dx,dy);
 
-    bullets.push({
-     x:u.x,y:u.y,
-     dx:dx/len, dy:dy/len,
-     owner:u,
-     born:performance.now(),
-     startX:u.x,startY:u.y,
-     range:u.range
-    });
-   }
+    // 遮蔽物回避
+    for(let o of obstacles){
+      if(!o.active) continue;
+      if(distance(u,o) < o.radius+5){
+        dx += (u.y-o.y);
+        dy -= (u.x-o.x);
+      }
+    }
 
-  }else{
-   let t=enemies.sort((a,b)=>distance(u,a)-distance(u,b))[0];
-   let dx=t.x-u.x, dy=t.y-u.y;
-   let len=Math.hypot(dx,dy);
-   u.x+=dx/len*2; u.y+=dy/len*2;
+    u.x+=dx/len*2;
+    u.y+=dy/len*2;
+  }
+
+  // 吸引
+  for(let o of obstacles){
+    if(!o.active) continue;
+    if(distance(u,o) < o.radius+10){
+      let dx=target.x-o.x;
+      let dy=target.y-o.y;
+      let len=Math.hypot(dx,dy);
+      u.x=o.x - dx/len*(o.radius+5);
+      u.y=o.y - dy/len*(o.radius+5);
+    }
   }
  }
 
+ // 弾
  for(let b of bullets){
 
   b.x+=b.dx*5;
   b.y+=b.dy*5;
 
-  for(let t of units){
-    if(t.dead || t.team===b.owner.team) continue;
-
-    if(distance(b,t)<8){
-
-      if(Math.random()>0.1){
-        let mult=damageTable[b.owner.attack][t.defense];
-        let dmg=2*mult;
-        t.hp-=dmg;
-        popups.push({x:t.x,y:t.y,text:"-"+dmg,life:50});
-        if(t.hp<=0) t.dead=true;
-      }else{
-        popups.push({x:t.x,y:t.y,text:"miss",life:50});
-      }
-
+  // 遮蔽物衝突
+  for(let o of obstacles){
+    if(!o.active) continue;
+    if(distance(b,o)<o.radius){
+      o.hp--;
+      if(o.hp<=0) o.active=false;
       b.hit=true;
-      break;
     }
   }
 
-  let d=Math.hypot(b.x-b.startX,b.y-b.startY);
-  if(d > b.range + 100) b.hit=true;
-
-  if(b.owner.dead && performance.now()-b.born > 1000) b.hit=true;
+  for(let t of units){
+    if(t.dead || t.team===b.owner.team) continue;
+    if(distance(b,t)<8){
+      t.hp-=2;
+      if(t.hp<=0) t.dead=true;
+      b.hit=true;
+    }
+  }
  }
 
  bullets=bullets.filter(b=>!b.hit);
 }
 
-function endGame(team){
- running=false;
- bullets=[];
- popups=[];
- setTimeout(()=>{
-  document.getElementById("winner").innerText=team+" 勝利";
- },800);
-}
-
 function draw(){
+
  ctx.clearRect(0,0,canvas.width,canvas.height);
 
+ // 遮蔽物
+ for(let o of obstacles){
+  if(!o.active) continue;
+
+  ctx.beginPath();
+  ctx.strokeStyle="black";
+  ctx.arc(o.x,o.y,o.radius,0,Math.PI*2);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.strokeStyle="gray";
+  ctx.arc(o.x,o.y,o.radius+5,0,Math.PI*2);
+  ctx.stroke();
+
+  ctx.beginPath();
+  ctx.strokeStyle="lightgray";
+  ctx.arc(o.x,o.y,o.radius+10,0,Math.PI*2);
+  ctx.stroke();
+ }
+
+ // ユニット
  for(let u of units){
   if(u.dead) continue;
-
   ctx.beginPath();
   ctx.fillStyle=u.team==="red"?"red":"blue";
   ctx.arc(u.x,u.y,10,0,Math.PI*2);
   ctx.fill();
-
-  ctx.fillStyle="white";
-  ctx.fillText(u.id,u.x-3,u.y+3);
-
-  let r=u.hp/u.maxHp;
-  let col="green"; if(r<0.5) col="orange"; if(r<0.2) col="red";
-
-  ctx.fillStyle="#ccc";
-  ctx.fillRect(u.x-15,u.y-20,30,4);
-
-  ctx.fillStyle=col;
-  ctx.fillRect(u.x-15,u.y-20,30*r,4);
-
-  ctx.fillStyle="black";
-  ctx.fillText(Math.ceil(u.hp),u.x-6,u.y-25);
  }
 
+ // 弾
  for(let b of bullets){
   ctx.beginPath();
-  ctx.fillStyle="black";
   ctx.arc(b.x,b.y,3,0,Math.PI*2);
   ctx.fill();
  }
-
- for(let p of popups){
-  ctx.globalAlpha=p.life/50;
-  ctx.fillText(p.text,p.x,p.y);
-  p.y-=0.5;
-  p.life--;
- }
- ctx.globalAlpha=1;
-
- popups=popups.filter(p=>p.life>0);
 }
 
 function loop(){
- if(!running) return;
-
- if(!paused){
-  let step=fast?20:1;
-  for(let i=0;i<step;i++) update();
- }
-
+ update();
  draw();
  requestAnimationFrame(loop);
 }
+
+buildUI();
 
 function buildUI(){
  let panel=document.getElementById("panel");
  panel.innerHTML="";
 
- for(let i=0;i<8;i++){
-  let team=i<4?"red":"blue";
-  let id=i<4?i+1:i-3;
-  let d=savedData[i]||defaultData();
-
-  let div=document.createElement("div");
-  div.className="unitBox";
-
-  div.innerHTML=`
-  <b>${team}${id}</b><br>
-
-  射程:
-  <select id="range${team}${id}">
-    ${RANGE_OPTIONS.map(v=>`<option ${v==d.range?"selected":""}>${v}</option>`).join("")}
-  </select><br>
-
-  HP:<input id="hp${team}${id}" value="${d.hp}"><br>
-
-  攻撃:
-  <select id="atk${team}${id}">
-    ${Object.keys(damageTable).map(a=>`<option ${a===d.attack?"selected":""}>${a}</option>`).join("")}
-  </select><br>
-
-  防御:
-  <select id="def${team}${id}">
-    ${["かるーい","おもーい","まぜまぜ","ふしぎー","もちもち"]
-      .map(a=>`<option ${a===d.defense?"selected":""}>${a}</option>`).join("")}
-  </select><br>
-
-  武器:
-  <select id="wp${team}${id}">
-    <option ${d.weapon==="なし"?"selected":""}>なし</option>
-  </select><br>
-
-  遮蔽:
-  <select id="cv${team}${id}">
-    <option ${d.cover==="使う"?"selected":""}>使う</option>
-    <option ${d.cover==="使わない"?"selected":""}>使わない</option>
+ // 遮蔽物UI
+ for(let i=0;i<5;i++){
+  panel.innerHTML+=`
+  <div class="box">
+  <b>遮蔽物${i+1}</b><br>
+  ON:<input type="checkbox" id="oa${i}"><br>
+  半径:<input type="range" min="5" max="30" id="or${i}"><br>
+  硬さ:
+  <select id="oh${i}">
+    <option>柔らかい</option>
+    <option selected>硬い</option>
+    <option>とても硬い</option>
   </select>
-  `;
-
-  panel.appendChild(div);
+  </div>`;
  }
 }
-
-buildUI();
 </script>
 </body>
 </html>
