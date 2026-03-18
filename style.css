@@ -1,47 +1,55 @@
 body {
   font-family: sans-serif;
-  background: #111;
-  color: white;
+  margin: 10px;
+}
+
+h1 {
   text-align: center;
 }
 
-#main {
+.controls {
   display: flex;
   justify-content: center;
-  gap: 20px;
-}
-
-canvas {
-  background: #222;
-  border: 2px solid #555;
-}
-
-#panel {
-  width: 300px;
-  height: 500px;
-  overflow-y: auto;
-  background: #1a1a1a;
-  padding: 10px;
-  border: 1px solid #444;
-}
-
-.unit-card {
-  border: 1px solid #555;
+  gap: 10px;
   margin-bottom: 10px;
 }
 
-.unit-header {
-  background: #333;
-  padding: 5px;
-  cursor: pointer;
+.container {
+  display: flex;
+  gap: 10px;
 }
 
-.unit-body {
-  padding: 5px;
-  display: none;
+canvas {
+  background: #111;
+  border: 1px solid #444;
 }
 
-input, select {
-  width: 100%;
+/* 4:7比率 */
+#battleCanvas {
+  width: 700px;
+  height: 400px;
+}
+
+.panel {
+  width: 300px;
+  height: 400px;
+  overflow-y: auto;
+  border: 1px solid #ccc;
+  padding: 5px;
+}
+
+.entity {
+  border: 1px solid #aaa;
   margin-bottom: 5px;
+}
+
+.entity-header {
+  background: #ddd;
+  cursor: pointer;
+  padding: 3px;
+}
+
+.entity-body {
+  display: none;
+  padding: 5px;
 }
