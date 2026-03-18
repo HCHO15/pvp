@@ -151,9 +151,30 @@ function initUnits() {
 }
 
 function resetBattle() {
-  units = [];
-  initialized = false;
-  initUnits();
+
+  // ★ 常に最新状態を保存
+  unitTemplates = units.map(u => ({
+    id: u.id,
+    team: u.team,
+    x: u.x,
+    y: u.y,
+    hp: u.hp,
+    maxHp: u.maxHp,
+    range: u.range,
+    attackType: u.attackType,
+    defenseType: u.defenseType
+  }));
+
+  // ★ 再生成
+  units = unitTemplates.map(t => {
+    const u = new Unit(t.id, t.team, t.x, t.y);
+    u.hp = t.hp;
+    u.maxHp = t.maxHp;
+    u.range = t.range;
+    u.attackType = t.attackType;
+    u.defenseType = t.defenseType;
+    return u;
+  });
 }
 
 // ======================
@@ -189,19 +210,14 @@ function checkWin() {
 
 // ======================
 document.getElementById("startBtn").onclick = () => {
-  if (!running) {
-    let redAlive = units.some(u => u.team === "red" && u.alive);
-    let blueAlive = units.some(u => u.team === "blue" && u.alive);
 
-    if (!redAlive || !blueAlive) {
-      resetBattle();
-      renderPanel();
-    }
-    
-    running = true;
-    paused = false;
-    requestAnimationFrame(loop);
-  }
+  // ★ 常にリセット
+  resetBattle();
+  renderPanel();
+
+  running = true;
+  paused = false;
+  requestAnimationFrame(loop);
 };
 
 document.getElementById("pauseBtn").onclick = () => {
