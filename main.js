@@ -9,10 +9,17 @@ const CENTER_Y = canvas.height / 2;
 
 let running = false;
 let paused = false;
+let initialized = false;
 
 const ATTACK_INTERVAL = 600;
-const SPEED = 1.5; // v1では少し調整
+const SPEED = 1.5;
 
+let units = [];
+let openState = {}; // 折りたたみ保持
+
+// ======================
+// Unitクラス
+// ======================
 class Unit {
   constructor(id, team, x, y) {
     this.id = id;
@@ -47,14 +54,6 @@ class Unit {
     );
   }
 
-  updateTarget(units) {
-    const newTarget = this.findClosestEnemy(units);
-    if (newTarget !== this.target) {
-      this.target = newTarget;
-      this.inRangeSince = null; // ターゲット変更でリセット
-    }
-  }
-
   moveToward(target) {
     let dx = target.x - this.x;
     let dy = target.y - this.y;
@@ -66,35 +65,44 @@ class Unit {
     this.y += (dy / dist) * SPEED;
   }
 
-  tryAttack(time) {
-    if (!this.target || !this.target.alive) return;
+  update(units, time) {
+    if (!this.alive) return;
 
-    // 射程チェック
+    // HPによる状態同期
+    if (this.hp <= 0) {
+      this.alive = false;
+      return;
+    } else {
+      this.alive = true;
+    }
+
+    // 毎フレームターゲット更新
+    this.target = this.findClosestEnemy(units);
+    if (!this.target) return;
+
     const dist = this.distanceTo(this.target);
 
+    // 射程外 → 移動
     if (dist > this.range) {
       this.inRangeSince = null;
       this.moveToward(this.target);
       return;
     }
 
-    // 射程内に入った瞬間を記録
+    // 射程内
     if (this.inRangeSince === null) {
       this.inRangeSince = time;
       return;
     }
 
-    // 0.6秒待機
-    if (time - this.inRangeSince < ATTACK_INTERVAL) {
-      return;
-    }
+    // 攻撃待機
+    if (time - this.inRangeSince < ATTACK_INTERVAL) return;
 
-    // 攻撃間隔
     if (time - this.lastAttack < ATTACK_INTERVAL) return;
 
     this.lastAttack = time;
 
-    // 10%ミス
+    // ミス
     if (Math.random() < 0.1) return;
 
     let damage = 2 * getMultiplier(this.attackType, this.target.defenseType);
@@ -106,57 +114,6 @@ class Unit {
       this.target = null;
     }
   }
-
-update(units, time) {
-  if (!this.alive) return;
-
-  // HPが外部変更された場合の復帰
-  if (this.hp > 0 && !this.alive) {
-    this.alive = true;
-  }
-
-  if (this.hp <= 0) {
-    this.alive = false;
-    return;
-  }
-
-  // 毎フレームターゲット更新（重要）
-  this.target = this.findClosestEnemy(units);
-
-  if (!this.target) return;
-
-  const dist = this.distanceTo(this.target);
-
-  // 射程外なら移動
-  if (dist > this.range) {
-    this.inRangeSince = null;
-    this.moveToward(this.target);
-    return;
-  }
-
-  // 射程内
-  if (this.inRangeSince === null) {
-    this.inRangeSince = time;
-    return;
-  }
-
-  if (time - this.inRangeSince < ATTACK_INTERVAL) return;
-
-  if (time - this.lastAttack < ATTACK_INTERVAL) return;
-
-  this.lastAttack = time;
-
-  if (Math.random() < 0.1) return;
-
-  let damage = 2 * getMultiplier(this.attackType, this.target.defenseType);
-
-  this.target.hp -= damage;
-
-  if (this.target.hp <= 0) {
-    this.target.alive = false;
-    this.target = null;
-  }
-}
 
   draw() {
     if (!this.alive) return;
@@ -179,7 +136,9 @@ update(units, time) {
   }
 }
 
+// ======================
 // ダメージ倍率
+// ======================
 function getMultiplier(atk, def) {
   const table = {
     "ドカン": {"かるーい":2,"おもーい":1,"まぜまぜ":1,"ふしぎー":0.5,"もちもち":0.5},
@@ -188,31 +147,33 @@ function getMultiplier(atk, def) {
     "グルル": {"かるーい":1,"おもーい":0.5,"まぜまぜ":0.5,"ふしぎー":2,"もちもち":1},
     "ブルブル": {"かるーい":1,"おもーい":0.5,"まぜまぜ":0.5,"ふしぎー":1.5,"もちもち":2},
   };
-
   return table[atk]?.[def] ?? 1;
 }
 
-// 初期配置
-let units = [];
-
+// ======================
+// 初期化（1回のみ）
+// ======================
 function initUnits() {
-  units = [];
+  if (initialized) return;
+  initialized = true;
 
   for (let i = 0; i < 4; i++) {
     units.push(new Unit("R"+i, "red", 50, 80 + i * 60));
     units.push(new Unit("B"+i, "blue", 650, 80 + i * 60));
   }
-
-  renderPanel();
 }
 
+// ======================
 // 描画
+// ======================
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   units.forEach(u => u.draw());
 }
 
+// ======================
 // ループ
+// ======================
 function loop(time) {
   if (!running) return;
 
@@ -226,7 +187,9 @@ function loop(time) {
   requestAnimationFrame(loop);
 }
 
+// ======================
 // 勝敗
+// ======================
 function checkWin() {
   let redAlive = units.some(u => u.team === "red" && u.alive);
   let blueAlive = units.some(u => u.team === "blue" && u.alive);
@@ -239,11 +202,15 @@ function checkWin() {
   }
 }
 
+// ======================
 // UI
+// ======================
 document.getElementById("startBtn").onclick = () => {
-  running = true;
-  paused = false;
-  requestAnimationFrame(loop);
+  if (!running) {
+    running = true;
+    paused = false;
+    requestAnimationFrame(loop);
+  }
 };
 
 document.getElementById("pauseBtn").onclick = () => {
@@ -258,7 +225,9 @@ document.getElementById("skipBtn").onclick = () => {
   }
 };
 
-// パネル
+// ======================
+// パネルUI
+// ======================
 function renderPanel() {
   const list = document.getElementById("entityList");
   list.innerHTML = "";
@@ -274,25 +243,21 @@ function renderPanel() {
     const body = document.createElement("div");
     body.className = "entity-body";
 
-    // プルダウン生成関数
+    // 折りたたみ状態復元
+    body.style.display = openState[u.id] ? "block" : "none";
+
     const createSelect = (options, value, onChange) => {
       const select = document.createElement("select");
       options.forEach(opt => {
         const o = document.createElement("option");
         o.value = opt;
         o.textContent = opt;
-        if (opt === value) o.selected = true;
+        if (String(opt) === String(value)) o.selected = true;
         select.appendChild(o);
       });
       select.onchange = () => onChange(select.value);
       return select;
     };
-
-    // 射程
-    const rangeOptions = [];
-    for (let i = 350; i <= 800; i += 50) {
-      rangeOptions.push(i);
-    }
 
     const container = document.createElement("div");
 
@@ -316,80 +281,50 @@ function renderPanel() {
     container.append("y:", yInput, document.createElement("br"));
 
     // 射程
+    const rangeOptions = [];
+    for (let i = 350; i <= 800; i += 50) rangeOptions.push(i);
+
     container.append("射程:");
-    container.append(
-      createSelect(rangeOptions, u.range, v => {
- 　　　 u.range = Number(v);
- 　　　 u.inRangeSince = null; // 再判定させる
-　　});
-    container.append(document.createElement("br"));
-
-    // 遮蔽
-    container.append("遮蔽:");
-    container.append(
-      createSelect(["使う", "使わない"], "使わない", v => {})
-    );
-    container.append(document.createElement("br"));
-
-    // 役割
-    container.append("役割:");
-    container.append(
-      createSelect(["アタック", "ディフェンス", "ヒール"], "アタック", v => {})
-    );
-    container.append(document.createElement("br"));
-
-    // 特殊挙動
-    container.append("特殊:");
-    container.append(createSelect(["なし"], "なし", v => {}));
+    container.append(createSelect(rangeOptions, u.range, v => {
+      u.range = Number(v);
+      u.inRangeSince = null;
+    }));
     container.append(document.createElement("br"));
 
     // HP
     const hpOptions = [];
     for (let i = 10; i <= 50; i++) hpOptions.push(i);
 
-    container.append(
-  　　createSelect(hpOptions, u.hp, v => {
-    　　u.hp = Number(v);
-   　　 u.maxHp = Number(v);
-
-    　　if (u.hp > 0) {
-      　　u.alive = true;
-   　　 }
-  　　})
-　　);
-
-    // 武器
-    container.append("武器:");
-    container.append(createSelect(["なし"], "なし", v => {}));
+    container.append("HP:");
+    container.append(createSelect(hpOptions, u.hp, v => {
+      u.hp = Number(v);
+      u.maxHp = Number(v);
+      if (u.hp > 0) u.alive = true;
+    }));
     container.append(document.createElement("br"));
 
     // 攻撃
     container.append("攻撃:");
-    container.append(
-      createSelect(
- 　　　　 ["ドカン", "ズバッ", "グルル", "ブルブル", "バラバラ"],
- 　　　　 u.attackType,
- 　　　　 v => {
-   　　　　 u.attackType = v;
-    　　　　console.log(u.id, "attack:", v);
-　　　　  }
-　　　　);
+    container.append(createSelect(
+      ["ドカン", "ズバッ", "グルル", "ブルブル", "バラバラ"],
+      u.attackType,
+      v => u.attackType = v
+    ));
     container.append(document.createElement("br"));
 
     // 防御
     container.append("防御:");
-    container.append(
-      createSelect(
-        ["かるーい", "おもーい", "ふしぎー", "もちもち", "まぜまぜ"],
-        u.defenseType,
-        v => (u.defenseType = v)
-      )
-    );
+    container.append(createSelect(
+      ["かるーい", "おもーい", "ふしぎー", "もちもち", "まぜまぜ"],
+      u.defenseType,
+      v => u.defenseType = v
+    ));
 
     body.appendChild(container);
 
     header.onclick = () => {
-      body.style.display = body.style.display === "none" ? "block" : "none";
+      openState[u.id] = !openState[u.id];
+      body.style.display = openState[u.id] ? "block" : "none";
     };
 
     div.appendChild(header);
@@ -398,5 +333,9 @@ function renderPanel() {
   });
 }
 
+// ======================
+// 初期実行
+// ======================
 initUnits();
+renderPanel();
 draw();
