@@ -4,218 +4,219 @@
 <meta charset="UTF-8">
 <title>A.R.E.S</title>
 <style>
-body {
-  font-family: sans-serif;
-  display: flex;
-}
-#left {
-  width: 70%;
-}
-#right {
-  width: 30%;
-}
-canvas {
-  border: 1px solid black;
-}
-button {
-  margin: 5px;
-}
-#winner {
-  font-size: 20px;
-  color: red;
-}
+body { display:flex; font-family:sans-serif; }
+#left { width:70%; }
+#right { width:30%; height:95vh; overflow:auto; }
+canvas { border:1px solid black; }
+.unitBox { border:1px solid #aaa; margin:5px; padding:5px; }
 </style>
 </head>
 <body>
 
 <div id="left">
-  <h2>A.R.E.S</h2>
-  <button onclick="start()">スタート</button>
-  <button onclick="pause()">一時停止/解除</button>
-  <button onclick="skip()">スキップ</button>
-  <div id="winner"></div>
-  <canvas id="canvas" width="700" height="400"></canvas>
+<h2>A.R.E.S</h2>
+<button onclick="start()">スタート</button>
+<button onclick="pause()">一時停止</button>
+<button onclick="skip()">スキップ</button>
+<div id="winner"></div>
+<canvas id="canvas" width="700" height="400"></canvas>
 </div>
 
 <div id="right"></div>
 
 <script>
-
-const canvas = document.getElementById("canvas");
 const ctx = canvas.getContext("2d");
 
-let running = false;
-let paused = false;
-let fast = false;
-
-let popups = [];
+let units=[], bullets=[], popups=[];
+let running=false, paused=false, fast=false;
 
 const damageTable = {
- "ドカン": {"かるーい":2,"おもーい":1,"まぜまぜ":1,"ふしぎー":0.5,"もちもち":0.5},
- "ズバッ": {"かるーい":0.5,"おもーい":2,"まぜまぜ":1,"ふしぎー":1,"もちもち":1},
- "バラバラ": {"かるーい":0.5,"おもーい":1.5,"まぜまぜ":2,"ふしぎー":1,"もちもち":1},
- "グルル": {"かるーい":1,"おもーい":0.5,"まぜまぜ":0.5,"ふしぎー":2,"もちもち":1},
- "ブルブル": {"かるーい":1,"おもーい":0.5,"まぜまぜ":0.5,"ふしぎー":1.5,"もちもち":2}
+ "ドカン":{"かるーい":2,"おもーい":1,"まぜまぜ":1,"ふしぎー":0.5,"もちもち":0.5},
+ "ズバッ":{"かるーい":0.5,"おもーい":2,"まぜまぜ":1,"ふしぎー":1,"もちもち":1},
+ "バラバラ":{"かるーい":0.5,"おもーい":1.5,"まぜまぜ":2,"ふしぎー":1,"もちもち":1},
+ "グルル":{"かるーい":1,"おもーい":0.5,"まぜまぜ":0.5,"ふしぎー":2,"もちもち":1},
+ "ブルブル":{"かるーい":1,"おもーい":0.5,"まぜまぜ":0.5,"ふしぎー":1.5,"もちもち":2}
 };
 
-class Unit {
-  constructor(team,x,y){
-    this.team = team;
-    this.x = x;
-    this.y = y;
-    this.maxHp = 30;
-    this.hp = 30;
-    this.range = 400;
-    this.attack = "ドカン";
-    this.defense = "かるーい";
-    this.lastAttack = 0;
-    this.dead = false;
-  }
+class Unit{
+ constructor(team,x,y,id){
+  this.team=team;
+  this.x=x; this.y=y;
+  this.id=id;
+  this.maxHp=30; this.hp=30;
+  this.range=400;
+  this.attack="ドカン";
+  this.defense="かるーい";
+  this.lastAttack=0;
+  this.dead=false;
+ }
 }
-
-let units = [];
 
 function init(){
-  units = [];
-  for(let i=0;i<4;i++){
-    units.push(new Unit("red",50,80*i+50));
-    units.push(new Unit("blue",650,80*i+50));
-  }
-  document.getElementById("winner").innerText = "";
+ units=[]; bullets=[]; popups=[];
+ for(let i=0;i<4;i++){
+  units.push(new Unit("red",50,80*i+50,i+1));
+  units.push(new Unit("blue",650,80*i+50,i+1));
+ }
+ document.getElementById("winner").innerText="";
+ buildUI();
 }
 
-function distance(a,b){
-  return Math.hypot(a.x-b.x,a.y-b.y);
-}
+function distance(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
 
 function update(){
 
-  for(let u of units){
-    if(u.dead) continue;
+ for(let u of units){
+  if(u.dead) continue;
 
-    let enemies = units.filter(e=>e.team!==u.team && !e.dead);
+  let enemies=units.filter(e=>e.team!==u.team && !e.dead);
+  if(enemies.length===0){endGame(u.team);return;}
 
-    if(enemies.length===0){
-      declareWinner(u.team);
-      return;
-    }
+  let inRange=enemies.filter(e=>distance(u,e)<=u.range);
 
-    let inRange = enemies.filter(e=>distance(u,e)<=u.range);
+  if(inRange.length>0){
+   let t=inRange.sort((a,b)=>distance(u,a)-distance(u,b))[0];
 
-    if(inRange.length>0){
-      let target = inRange.sort((a,b)=>distance(u,a)-distance(u,b))[0];
+   if(performance.now()-u.lastAttack>600){
+    u.lastAttack=performance.now();
 
-      if(performance.now()-u.lastAttack>600){
-        u.lastAttack = performance.now();
+    bullets.push({
+      x:u.x,y:u.y,target:t,owner:u,speed:5
+    });
+   }
 
-        if(Math.random()>0.1){
-          let mult = damageTable[u.attack][target.defense];
-          let dmg = 2 * mult;
+  }else{
+   let t=enemies.sort((a,b)=>distance(u,a)-distance(u,b))[0];
+   let dx=t.x-u.x, dy=t.y-u.y;
+   let len=Math.hypot(dx,dy);
+   u.x+=dx/len*2; u.y+=dy/len*2;
+  }
+ }
 
-          target.hp -= dmg;
+ // 弾処理
+ for(let b of bullets){
+  if(b.target.dead) continue;
 
-          popups.push({
-            x: target.x,
-            y: target.y,
-            text: "-" + dmg,
-            life: 50
-          });
+  let dx=b.target.x-b.x, dy=b.target.y-b.y;
+  let len=Math.hypot(dx,dy);
+  b.x+=dx/len*b.speed;
+  b.y+=dy/len*b.speed;
 
-          if(target.hp<=0){
-            target.dead = true;
-          }
-        }
-      }
+  if(len<6){
+    if(Math.random()>0.1){
+      let mult=damageTable[b.owner.attack][b.target.defense];
+      let dmg=2*mult;
+      b.target.hp-=dmg;
+
+      popups.push({x:b.target.x,y:b.target.y,text:"-"+dmg,life:50});
+
+      if(b.target.hp<=0) b.target.dead=true;
 
     }else{
-      let nearest = enemies.sort((a,b)=>distance(u,a)-distance(u,b))[0];
-      let dx = nearest.x - u.x;
-      let dy = nearest.y - u.y;
-      let len = Math.hypot(dx,dy);
-      u.x += dx/len*2;
-      u.y += dy/len*2;
+      popups.push({x:b.target.x,y:b.target.y,text:"miss",life:50});
     }
+    b.hit=true;
   }
+ }
+ bullets=bullets.filter(b=>!b.hit);
 }
 
-function declareWinner(team){
-  running = false;
-  document.getElementById("winner").innerText = team + " 勝利";
+function endGame(team){
+ running=false;
+ popups=[];
+ setTimeout(()=>{
+  document.getElementById("winner").innerText=team+" 勝利";
+ },800);
 }
 
 function draw(){
-  ctx.clearRect(0,0,canvas.width,canvas.height);
+ ctx.clearRect(0,0,canvas.width,canvas.height);
 
-  for(let u of units){
-    if(u.dead) continue;
+ for(let u of units){
+  if(u.dead) continue;
 
-    // 本体
-    ctx.beginPath();
-    ctx.fillStyle = u.team==="red"?"red":"blue";
-    ctx.arc(u.x,u.y,8,0,Math.PI*2);
-    ctx.fill();
+  ctx.beginPath();
+  ctx.fillStyle=u.team==="red"?"red":"blue";
+  ctx.arc(u.x,u.y,10,0,Math.PI*2);
+  ctx.fill();
 
-    // HPバー
-    let ratio = u.hp / u.maxHp;
-    let color = "green";
-    if(ratio < 0.5) color = "orange";
-    if(ratio < 0.2) color = "red";
+  // 番号
+  ctx.fillStyle="white";
+  ctx.font="10px sans-serif";
+  ctx.fillText(u.id,u.x-3,u.y+3);
 
-    ctx.fillStyle = "#ccc";
-    ctx.fillRect(u.x-15,u.y-18,30,4);
+  // HPバー
+  let r=u.hp/u.maxHp;
+  let col="green"; if(r<0.5) col="orange"; if(r<0.2) col="red";
+  ctx.fillStyle="#ccc"; ctx.fillRect(u.x-15,u.y-20,30,4);
+  ctx.fillStyle=col; ctx.fillRect(u.x-15,u.y-20,30*r,4);
 
-    ctx.fillStyle = color;
-    ctx.fillRect(u.x-15,u.y-18,30*ratio,4);
+  ctx.fillStyle="black";
+  ctx.fillText(Math.ceil(u.hp),u.x-6,u.y-25);
+ }
 
-    // HP数値
-    ctx.fillStyle = "black";
-    ctx.font = "10px sans-serif";
-    ctx.fillText(Math.ceil(u.hp), u.x-6, u.y-22);
-  }
+ // 弾
+ for(let b of bullets){
+  ctx.beginPath();
+  ctx.fillStyle="black";
+  ctx.arc(b.x,b.y,3,0,Math.PI*2);
+  ctx.fill();
+ }
 
-  // ポップアップ
-  for(let p of popups){
-    ctx.globalAlpha = p.life/50;
-    ctx.fillStyle = "black";
-    ctx.font = "12px sans-serif";
-    ctx.fillText(p.text,p.x,p.y);
+ // ポップアップ
+ for(let p of popups){
+  ctx.globalAlpha=p.life/50;
+  ctx.fillStyle="black";
+  ctx.fillText(p.text,p.x,p.y);
+  p.y-=0.5; p.life--;
+ }
+ ctx.globalAlpha=1;
 
-    p.y -= 0.5;
-    p.life--;
-  }
-  ctx.globalAlpha = 1;
-
-  popups = popups.filter(p=>p.life>0);
+ popups=popups.filter(p=>p.life>0);
 }
 
 function loop(){
-  if(!running) return;
-
-  if(!paused){
-    let step = fast?20:1;
-    for(let i=0;i<step;i++) update();
-  }
-
-  draw();
-  requestAnimationFrame(loop);
+ if(!running) return;
+ if(!paused){
+  let step=fast?20:1;
+  for(let i=0;i<step;i++) update();
+ }
+ draw();
+ requestAnimationFrame(loop);
 }
 
-function start(){
-  running = true;
-  paused = false;
-  fast = false;
-  init();
-  loop();
+function start(){running=true;paused=false;fast=false;init();loop();}
+function pause(){paused=!paused;}
+function skip(){fast=true;}
+
+// UI
+function buildUI(){
+ let panel=document.getElementById("right");
+ panel.innerHTML="";
+
+ units.forEach((u,i)=>{
+  let div=document.createElement("div");
+  div.className="unitBox";
+
+  div.innerHTML=`
+  <b>${u.team}${u.id}</b><br>
+  射程:<input type="number" value="${u.range}" onchange="units[${i}].range=this.value"><br>
+  HP:<input type="number" value="${u.hp}" onchange="units[${i}].hp=this.value"><br>
+  攻撃:
+  <select onchange="units[${i}].attack=this.value">
+    ${Object.keys(damageTable).map(a=>`<option ${a===u.attack?"selected":""}>${a}</option>`).join("")}
+  </select><br>
+  防御:
+  <select onchange="units[${i}].defense=this.value">
+    ${Object.values(damageTable["ドカン"]).map((_,i)=>["かるーい","おもーい","まぜまぜ","ふしぎー","もちもち"][i]).map(d=>`<option ${d===u.defense?"selected":""}>${d}</option>`).join("")}
+  </select>
+  `;
+
+  panel.appendChild(div);
+ });
 }
 
-function pause(){
-  paused = !paused;
-}
-
-function skip(){
-  fast = true;
-}
-
+init();
 </script>
 </body>
 </html>
