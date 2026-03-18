@@ -1,21 +1,173 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
-  <title>A.R.E.S</title>
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<title>A.R.E.S</title>
+<style>
+body {
+  font-family: sans-serif;
+  display: flex;
+}
+#left {
+  width: 70%;
+}
+#right {
+  width: 30%;
+  overflow-y: scroll;
+  height: 95vh;
+}
+canvas {
+  border: 1px solid black;
+}
+button {
+  margin: 5px;
+}
+.unit {
+  border: 1px solid #ccc;
+  margin: 5px;
+  padding: 5px;
+}
+</style>
 </head>
 <body>
 
-<h1>A.R.E.S</h1>
-
-<div class="container">
-  <canvas id="battleCanvas"></canvas>
-  <div id="panel"></div>
+<div id="left">
+  <h2>A.R.E.S</h2>
+  <button onclick="start()">スタート</button>
+  <button onclick="pause()">一時停止/解除</button>
+  <button onclick="skip()">スキップ</button>
+  <canvas id="canvas" width="700" height="400"></canvas>
 </div>
 
-<button id="startBtn">スタート</button>
+<div id="right" id="panel"></div>
 
-<script src="main.js"></script>
+<script>
+
+const canvas = document.getElementById("canvas");
+const ctx = canvas.getContext("2d");
+
+let running = false;
+let paused = false;
+let fast = false;
+
+const RANGE_VALUES = Array.from({length:10},(_,i)=>350+i*50);
+
+const damageTable = {
+ "ドカン": {"かるーい":2,"おもーい":1,"まぜまぜ":1,"ふしぎー":0.5,"もちもち":0.5},
+ "ズバッ": {"かるーい":0.5,"おもーい":2,"まぜまぜ":1,"ふしぎー":1,"もちもち":1},
+ "バラバラ": {"かるーい":0.5,"おもーい":1.5,"まぜまぜ":2,"ふしぎー":1,"もちもち":1},
+ "グルル": {"かるーい":1,"おもーい":0.5,"まぜまぜ":0.5,"ふしぎー":2,"もちもち":1},
+ "ブルブル": {"かるーい":1,"おもーい":0.5,"まぜまぜ":0.5,"ふしぎー":1.5,"もちもち":2}
+};
+
+class Unit {
+  constructor(team,x,y){
+    this.team = team;
+    this.x = x;
+    this.y = y;
+    this.hp = 30;
+    this.range = 400;
+    this.attack = "ドカン";
+    this.defense = "かるーい";
+    this.lastAttack = 0;
+    this.target = null;
+    this.dead = false;
+  }
+}
+
+let units = [];
+
+function init(){
+  units = [];
+  for(let i=0;i<4;i++){
+    units.push(new Unit("red",50,80*i+50));
+    units.push(new Unit("blue",650,80*i+50));
+  }
+}
+init();
+
+function distance(a,b){
+  return Math.hypot(a.x-b.x,a.y-b.y);
+}
+
+function update(dt){
+
+  for(let u of units){
+    if(u.dead) continue;
+
+    let enemies = units.filter(e=>e.team!==u.team && !e.dead);
+
+    if(enemies.length===0) return;
+
+    // ターゲット選択
+    let inRange = enemies.filter(e=>distance(u,e)<=u.range);
+
+    if(inRange.length>0){
+      u.target = inRange.sort((a,b)=>distance(u,a)-distance(u,b))[0];
+
+      // 攻撃
+      if(performance.now()-u.lastAttack>600){
+        u.lastAttack = performance.now();
+
+        if(Math.random()>0.1){
+          let mult = damageTable[u.attack][u.target.defense];
+          let dmg = 2*mult;
+          u.target.hp -= dmg;
+          if(u.target.hp<=0) u.target.dead=true;
+        }
+      }
+
+    }else{
+      // 移動
+      let nearest = enemies.sort((a,b)=>distance(u,a)-distance(u,b))[0];
+      let dx = nearest.x - u.x;
+      let dy = nearest.y - u.y;
+      let len = Math.hypot(dx,dy);
+      u.x += dx/len*2;
+      u.y += dy/len*2;
+    }
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+
+  for(let u of units){
+    if(u.dead) continue;
+    ctx.beginPath();
+    ctx.fillStyle = u.team==="red"?"red":"blue";
+    ctx.arc(u.x,u.y,8,0,Math.PI*2);
+    ctx.fill();
+  }
+}
+
+function loop(){
+  if(!running) return;
+  if(!paused){
+    let step = fast?20:1;
+    for(let i=0;i<step;i++) update();
+  }
+  draw();
+
+  requestAnimationFrame(loop);
+}
+
+function start(){
+  running = true;
+  paused = false;
+  fast = false;
+  init();
+  loop();
+}
+
+function pause(){
+  paused = !paused;
+}
+
+function skip(){
+  fast = true;
+}
+
+</script>
 </body>
 </html>
