@@ -1,10 +1,11 @@
 const canvas = document.getElementById("battleCanvas");
 const ctx = canvas.getContext("2d");
 
+// ★ここ重要（CSSと一致させる）
 canvas.width = 700;
 canvas.height = 400;
 
-// 中央座標系
+// ===== 座標変換 =====
 function toCanvasX(x) {
   return canvas.width / 2 + x;
 }
@@ -26,7 +27,7 @@ function initUnits() {
       team: "red",
       x: -300,
       y: (i - 1.5) * spacing,
-      speed: 10
+      speed: 2   // ← ★まずは小さく（重要）
     });
   }
 
@@ -36,17 +37,19 @@ function initUnits() {
       team: "blue",
       x: 300,
       y: (i - 1.5) * spacing,
-      speed: 10
+      speed: 2
     });
   }
+
+  console.log("units:", units); // デバッグ
 }
 
-// ===== 最も近い敵を取得 =====
+// ===== 最も近い敵 =====
 function getNearestEnemy(unit) {
   let nearest = null;
   let minDist = Infinity;
 
-  units.forEach(other => {
+  for (let other of units) {
     if (other.team !== unit.team) {
       const dx = other.x - unit.x;
       const dy = other.y - unit.y;
@@ -57,38 +60,38 @@ function getNearestEnemy(unit) {
         nearest = other;
       }
     }
-  });
+  }
 
   return nearest;
 }
 
-// ===== 移動処理 =====
+// ===== 更新 =====
 function update() {
-  units.forEach(u => {
+  for (let u of units) {
     const target = getNearestEnemy(u);
-    if (!target) return;
+    if (!target) continue;
 
     const dx = target.x - u.x;
     const dy = target.y - u.y;
     const dist = Math.hypot(dx, dy);
 
-    if (dist > 0) {
+    if (dist > 0.1) {
       u.x += (dx / dist) * u.speed;
       u.y += (dy / dist) * u.speed;
     }
-  });
+  }
 }
 
 // ===== 描画 =====
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  units.forEach(u => {
+  for (let u of units) {
     ctx.beginPath();
     ctx.arc(toCanvasX(u.x), toCanvasY(u.y), 6, 0, Math.PI * 2);
-    ctx.fillStyle = u.team === "red" ? "red" : "blue";
+    ctx.fillStyle = (u.team === "red") ? "red" : "blue";
     ctx.fill();
-  });
+  }
 }
 
 // ===== ループ =====
@@ -98,6 +101,7 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-// ===== 実行 =====
+// ===== 起動 =====
 initUnits();
+draw(); // ← ★これ超重要（最初に描画）
 loop();
