@@ -3,54 +3,26 @@
 <head>
   <meta charset="UTF-8">
   <title>A.R.E.S</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      text-align: center;
-      background: #111;
-      color: white;
-    }
-
-    h1 {
-      margin: 10px;
-    }
-
-    #controls {
-      margin-bottom: 10px;
-    }
-
-    button {
-      margin: 5px;
-      padding: 10px 20px;
-      font-size: 16px;
-    }
-
-    canvas {
-      background: #222;
-      border: 2px solid #555;
-    }
-
-    #result {
-      margin-top: 10px;
-      font-size: 20px;
-      font-weight: bold;
-    }
-  </style>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-  <h1>A.R.E.S</h1>
+<h1>A.R.E.S</h1>
 
-  <div id="controls">
-    <button onclick="startGame()">スタート</button>
-    <button onclick="togglePause()">一時停止 / 再開</button>
-    <button onclick="skipGame()">スキップ</button>
-  </div>
+<div id="controls">
+  <button onclick="startGame()">スタート</button>
+  <button onclick="togglePause()">一時停止 / 再開</button>
+  <button onclick="skipGame()">スキップ</button>
+</div>
 
+<div id="main">
   <canvas id="gameCanvas" width="900" height="500"></canvas>
 
-  <div id="result"></div>
+  <div id="panel"></div>
+</div>
 
-  <script src="script.js"></script>
+<div id="result"></div>
+
+<script src="script.js"></script>
 </body>
 </html>
