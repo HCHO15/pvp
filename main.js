@@ -15,10 +15,11 @@ const ATTACK_INTERVAL = 600;
 const SPEED = 1.5;
 
 let units = [];
+let unitTemplates = []; // ★ 追加：設定保持用
 let openState = {};
 
 // ======================
-// Unit
+// Unitクラス
 // ======================
 class Unit {
   constructor(id, team, x, y) {
@@ -128,6 +129,8 @@ class Unit {
 }
 
 // ======================
+// ダメージ倍率
+// ======================
 function getMultiplier(atk, def) {
   const table = {
     "ドカン": {"かるーい":2,"おもーい":1,"まぜまぜ":1,"ふしぎー":0.5,"もちもち":0.5},
@@ -140,6 +143,8 @@ function getMultiplier(atk, def) {
 }
 
 // ======================
+// 初期生成（1回のみ）
+// ======================
 function initUnits() {
   if (initialized) return;
   initialized = true;
@@ -150,9 +155,12 @@ function initUnits() {
   }
 }
 
+// ======================
+// ★ リセット（設定保持版）
+// ======================
 function resetBattle() {
 
-  // ★ 常に最新状態を保存
+  // 最新状態をテンプレとして保存
   unitTemplates = units.map(u => ({
     id: u.id,
     team: u.team,
@@ -165,7 +173,7 @@ function resetBattle() {
     defenseType: u.defenseType
   }));
 
-  // ★ 再生成
+  // テンプレから再生成
   units = unitTemplates.map(t => {
     const u = new Unit(t.id, t.team, t.x, t.y);
     u.hp = t.hp;
@@ -204,14 +212,16 @@ function checkWin() {
 
   if (!redAlive || !blueAlive) {
     running = false;
-    alert(redAlive ? "赤の勝ち！" : "青の勝ち！");
+    setTimeout(() => {
+      alert(redAlive ? "赤の勝ち！" : "青の勝ち！");
+    }, 50);
   }
 }
 
 // ======================
+// UI
+// ======================
 document.getElementById("startBtn").onclick = () => {
-
-  // ★ 常にリセット
   resetBattle();
   renderPanel();
 
@@ -232,6 +242,8 @@ document.getElementById("skipBtn").onclick = () => {
   }
 };
 
+// ======================
+// パネルUI
 // ======================
 function renderPanel() {
   const list = document.getElementById("entityList");
@@ -290,6 +302,8 @@ function renderPanel() {
   });
 }
 
+// ======================
+// 初期実行
 // ======================
 initUnits();
 renderPanel();
