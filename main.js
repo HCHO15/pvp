@@ -150,6 +150,12 @@ function initUnits() {
   }
 }
 
+function resetBattle() {
+  units = [];
+  initialized = false;
+  initUnits();
+}
+
 // ======================
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -184,6 +190,14 @@ function checkWin() {
 // ======================
 document.getElementById("startBtn").onclick = () => {
   if (!running) {
+    let redAlive = units.some(u => u.team === "red" && u.alive);
+    let blueAlive = units.some(u => u.team === "blue" && u.alive);
+
+    if (!redAlive || !blueAlive) {
+      resetBattle();
+      renderPanel();
+    }
+    
     running = true;
     paused = false;
     requestAnimationFrame(loop);
