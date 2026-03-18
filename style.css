@@ -1,55 +1,15 @@
 body {
   font-family: sans-serif;
-  margin: 10px;
-}
-
-h1 {
   text-align: center;
-}
-
-.controls {
-  display: flex;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 10px;
 }
 
 .container {
   display: flex;
-  gap: 10px;
+  justify-content: center;
 }
 
 canvas {
-  background: #111;
-  border: 1px solid #444;
-}
-
-/* 4:7比率 */
-#battleCanvas {
+  border: 1px solid black;
   width: 700px;
-  height: 400px;
-}
-
-.panel {
-  width: 300px;
-  height: 400px;
-  overflow-y: auto;
-  border: 1px solid #ccc;
-  padding: 5px;
-}
-
-.entity {
-  border: 1px solid #aaa;
-  margin-bottom: 5px;
-}
-
-.entity-header {
-  background: #ddd;
-  cursor: pointer;
-  padding: 3px;
-}
-
-.entity-body {
-  display: none;
-  padding: 5px;
+  height: 400px; /* 4:7比率 */
 }
