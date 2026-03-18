@@ -1,297 +1,58 @@
 const canvas = document.getElementById("battleCanvas");
 const ctx = canvas.getContext("2d");
 
+// 解像度設定（見た目と内部を一致）
 canvas.width = 700;
 canvas.height = 400;
 
-const CENTER_X = canvas.width / 2;
-const CENTER_Y = canvas.height / 2;
-
-let running = false;
-let paused = false;
-
-const ATTACK_INTERVAL = 600;
-const SPEED = 1.5;
-
-let units = [];
-let unitTemplates = []; // ★ 設定保存
-let openState = {};
-
-// ======================
-// Unitクラス
-// ======================
-class Unit {
-  constructor(id, team, x, y) {
-    this.id = id;
-    this.team = team;
-    this.x = x;
-    this.y = y;
-
-    this.hp = 30;
-    this.maxHp = 30;
-    this.range = 500;
-
-    this.attackType = "ドカン";
-    this.defenseType = "かるーい";
-
-    this.lastAttack = 0;
-    this.inRangeSince = null;
-
-    this.target = null;
-    this.alive = true;
-  }
-
-  distanceTo(other) {
-    return Math.hypot(this.x - other.x, this.y - other.y);
-  }
-
-  findClosestEnemy(units) {
-    let enemies = units.filter(u => u.team !== this.team && u.alive);
-    if (enemies.length === 0) return null;
-
-    return enemies.reduce((a, b) =>
-      this.distanceTo(a) < this.distanceTo(b) ? a : b
-    );
-  }
-
-  moveToward(target) {
-    let dx = target.x - this.x;
-    let dy = target.y - this.y;
-    let dist = Math.hypot(dx, dy);
-
-    if (dist === 0) return;
-
-    this.x += (dx / dist) * SPEED;
-    this.y += (dy / dist) * SPEED;
-  }
-
-  update(units, time) {
-    if (!this.alive) return;
-
-    if (this.hp <= 0) {
-      this.alive = false;
-      return;
-    }
-
-    this.target = this.findClosestEnemy(units);
-    if (!this.target) return;
-
-    const dist = this.distanceTo(this.target);
-
-    if (dist > this.range) {
-      this.inRangeSince = null;
-      this.moveToward(this.target);
-      return;
-    }
-
-    if (this.inRangeSince === null) {
-      this.inRangeSince = time;
-      return;
-    }
-
-    if (time - this.inRangeSince < ATTACK_INTERVAL) return;
-    if (time - this.lastAttack < ATTACK_INTERVAL) return;
-
-    this.lastAttack = time;
-
-    if (Math.random() < 0.1) return;
-
-    let damage = 2 * getMultiplier(this.attackType, this.target.defenseType);
-
-    this.target.hp -= damage;
-
-    if (this.target.hp <= 0) {
-      this.target.alive = false;
-    }
-  }
-
-  draw() {
-    if (!this.alive) return;
-
-    ctx.beginPath();
-    ctx.arc(this.x, this.y, 6, 0, Math.PI * 2);
-    ctx.fillStyle = this.team === "red" ? "red" : "blue";
-    ctx.fill();
-
-    const barWidth = 20;
-    const hpRatio = this.hp / this.maxHp;
-
-    ctx.fillStyle = "black";
-    ctx.fillRect(this.x - barWidth / 2, this.y - 12, barWidth, 3);
-
-    ctx.fillStyle = "lime";
-    ctx.fillRect(this.x - barWidth / 2, this.y - 12, barWidth * hpRatio, 3);
-  }
+// 中央座標系
+function toCanvasX(x) {
+  return canvas.width / 2 + x;
+}
+function toCanvasY(y) {
+  return canvas.height / 2 - y;
 }
 
-// ======================
-// ダメージ倍率
-// ======================
-function getMultiplier(atk, def) {
-  const table = {
-    "ドカン": {"かるーい":2,"おもーい":1,"まぜまぜ":1,"ふしぎー":0.5,"もちもち":0.5},
-    "ズバッ": {"かるーい":0.5,"おもーい":2,"まぜまぜ":1,"ふしぎー":1,"もちもち":1},
-    "バラバラ": {"かるーい":0.5,"おもーい":1.5,"まぜまぜ":2,"ふしぎー":1,"もちもち":1},
-    "グルル": {"かるーい":1,"おもーい":0.5,"まぜまぜ":0.5,"ふしぎー":2,"もちもち":1},
-    "ブルブル": {"かるーい":1,"おもーい":0.5,"まぜまぜ":0.5,"ふしぎー":1.5,"もちもち":2},
-  };
-  return table[atk]?.[def] ?? 1;
-}
+// ユニット
+const units = [];
 
-// ======================
-// 初期テンプレ生成
-// ======================
+// 初期配置
 function initUnits() {
-  if (unitTemplates.length > 0) return;
+  units.length = 0;
 
+  const spacing = 60;
+
+  // 赤（左）
   for (let i = 0; i < 4; i++) {
-    unitTemplates.push({
-      id: "R"+i,
+    units.push({
       team: "red",
-      x: 50,
-      y: 80 + i * 60,
-      hp: 30,
-      maxHp: 30,
-      range: 500,
-      attackType: "ドカン",
-      defenseType: "かるーい"
+      x: -300,
+      y: (i - 1.5) * spacing
     });
+  }
 
-    unitTemplates.push({
-      id: "B"+i,
+  // 青（右）
+  for (let i = 0; i < 4; i++) {
+    units.push({
       team: "blue",
-      x: 650,
-      y: 80 + i * 60,
-      hp: 30,
-      maxHp: 30,
-      range: 500,
-      attackType: "ドカン",
-      defenseType: "かるーい"
+      x: 300,
+      y: (i - 1.5) * spacing
     });
   }
 }
 
-// ======================
-// リセット（templates→units）
-// ======================
-function resetBattle() {
-  units = unitTemplates.map(t => {
-    const u = new Unit(t.id, t.team, t.x, t.y);
-    u.hp = t.hp;
-    u.maxHp = t.maxHp;
-    u.range = t.range;
-    u.attackType = t.attackType;
-    u.defenseType = t.defenseType;
-    return u;
-  });
-}
-
-// ======================
+// 描画
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  units.forEach(u => u.draw());
-}
 
-// ======================
-function loop(time) {
-  if (!running) return;
-
-  if (!paused) {
-    units.forEach(u => u.update(units, time));
-  }
-
-  draw();
-  checkWin();
-
-  requestAnimationFrame(loop);
-}
-
-// ======================
-function checkWin() {
-  let redAlive = units.some(u => u.team === "red" && u.alive);
-  let blueAlive = units.some(u => u.team === "blue" && u.alive);
-
-  if (!redAlive || !blueAlive) {
-    running = false;
-    setTimeout(() => {
-      alert(redAlive ? "赤の勝ち！" : "青の勝ち！");
-    }, 50);
-  }
-}
-
-// ======================
-// UI
-// ======================
-document.getElementById("startBtn").onclick = () => {
-  resetBattle();
-  renderPanel();
-
-  running = true;
-  paused = false;
-  requestAnimationFrame(loop);
-};
-
-document.getElementById("pauseBtn").onclick = () => {
-  paused = !paused;
-};
-
-// ======================
-// パネルUI
-// ======================
-function renderPanel() {
-  const list = document.getElementById("entityList");
-  list.innerHTML = "";
-
-  unitTemplates.forEach(t => {
-
-    const div = document.createElement("div");
-
-    const header = document.createElement("div");
-    header.textContent = `${t.id} (${t.team})`;
-
-    const body = document.createElement("div");
-    body.style.display = openState[t.id] ? "block" : "none";
-
-    // X
-    const xInput = document.createElement("input");
-    xInput.type = "number";
-    xInput.value = Math.round(t.x - CENTER_X);
-    xInput.onchange = () => t.x = Number(xInput.value) + CENTER_X;
-
-    // Y
-    const yInput = document.createElement("input");
-    yInput.type = "number";
-    yInput.value = Math.round(t.y - CENTER_Y);
-    yInput.onchange = () => t.y = Number(yInput.value) + CENTER_Y;
-
-    // HP
-    const hpInput = document.createElement("input");
-    hpInput.type = "number";
-    hpInput.value = t.hp;
-    hpInput.onchange = () => {
-      t.hp = Number(hpInput.value);
-      t.maxHp = t.hp;
-    };
-
-    body.append("x:", xInput, document.createElement("br"));
-    body.append("y:", yInput, document.createElement("br"));
-    body.append("HP:", hpInput);
-
-    header.onclick = () => {
-      openState[t.id] = !openState[t.id];
-      body.style.display = openState[t.id] ? "block" : "none";
-    };
-
-    div.appendChild(header);
-    div.appendChild(body);
-    list.appendChild(div);
+  units.forEach(u => {
+    ctx.beginPath();
+    ctx.arc(toCanvasX(u.x), toCanvasY(u.y), 6, 0, Math.PI * 2);
+    ctx.fillStyle = u.team === "red" ? "red" : "blue";
+    ctx.fill();
   });
 }
 
-// ======================
-// 初期実行
-// ======================
+// 初期化
 initUnits();
-resetBattle();
-renderPanel();
 draw();
