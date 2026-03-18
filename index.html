@@ -171,25 +171,30 @@ function update(){
 
     if(distance(b,t)<8){
 
-      if(Math.random()>0.1){
+      if(Math.random() > 0.1){
 
         let isCritical = Math.random() < 0.2;
 
-        let mult=damageTable[b.owner.attack][t.defense];
-        let baseDamage=2*mult;
-        let dmg = isCritical ? baseDamage*2 : baseDamage;
+        let mult = damageTable[b.owner.attack][t.defense];
+        let baseDamage = 2 * mult;
+        let dmg = isCritical ? baseDamage * 2 : baseDamage;
 
         t.hp -= dmg;
+
+        // ダメージ色判定
+        let typeColor = "normal";
+        if(mult === 0.5) typeColor = "weak";
+        else if(mult === 2) typeColor = "strong";
 
         popups.push({
           x:t.x,
           y:t.y,
-          text:isCritical ? "CRITICAL -" + dmg : "-" + dmg,
+          text:"-" + Math.ceil(dmg),
           life:50,
-          type:isCritical ? "crit" : "normal"
+          type: isCritical ? "crit" : typeColor
         });
 
-        if(t.hp<=0) t.dead=true;
+        if(t.hp <= 0) t.dead=true;
 
       }else{
         popups.push({
@@ -263,8 +268,19 @@ function draw(){
   ctx.globalAlpha = p.life / 50;
 
   if(p.type === "crit"){
-    ctx.fillStyle = "red";
+    ctx.fillStyle = "white";
     ctx.font = "bold 16px sans-serif";
+    ctx.strokeStyle = "yellow";
+    ctx.lineWidth = 2;
+    ctx.strokeText(p.text, p.x, p.y);
+  }
+  else if(p.type === "strong"){
+    ctx.fillStyle = "red";
+    ctx.font = "12px sans-serif";
+  }
+  else if(p.type === "weak"){
+    ctx.fillStyle = "blue";
+    ctx.font = "12px sans-serif";
   }
   else if(p.type === "miss"){
     ctx.fillStyle = "gray";
@@ -276,14 +292,12 @@ function draw(){
   }
 
   ctx.fillText(p.text, p.x, p.y);
-
   p.y -= (p.type === "crit") ? 1.2 : 0.5;
   p.life--;
- }
+}
 
- ctx.globalAlpha = 1;
-
- popups=popups.filter(p=>p.life>0);
+ctx.globalAlpha = 1;
+popups = popups.filter(p => p.life > 0);
 }
 
 function loop(){
