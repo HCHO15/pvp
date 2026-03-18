@@ -22,12 +22,16 @@ canvas { border:1px solid black; }
 <canvas id="canvas" width="700" height="400"></canvas>
 </div>
 
-<div id="right"></div>
+<div id="right">
+<button onclick="saveStatus()">ステータス保存</button>
+<div id="panel"></div>
+</div>
 
 <script>
 const ctx = canvas.getContext("2d");
 
 let units=[], bullets=[], popups=[];
+let savedData=[];
 let running=false, paused=false, fast=false;
 
 const damageTable = {
@@ -41,12 +45,17 @@ const damageTable = {
 class Unit{
  constructor(team,x,y,id){
   this.team=team;
-  this.x=x; this.y=y;
   this.id=id;
+  this.x=x; this.y=y;
+
   this.maxHp=30; this.hp=30;
   this.range=400;
+
   this.attack="ドカン";
   this.defense="かるーい";
+  this.weapon="なし";
+  this.cover="使わない";
+
   this.lastAttack=0;
   this.dead=false;
  }
@@ -56,11 +65,43 @@ function init(){
  units=[]; bullets=[]; popups=[];
  for(let i=0;i<4;i++){
   units.push(new Unit("red",50,80*i+50,i+1));
+ }
+ for(let i=0;i<4;i++){
   units.push(new Unit("blue",650,80*i+50,i+1));
  }
  document.getElementById("winner").innerText="";
  buildUI();
 }
+
+function applySaved(){
+ if(savedData.length===0) return;
+ units.forEach((u,i)=>{
+  Object.assign(u, savedData[i]);
+ });
+}
+
+function saveStatus(){
+ savedData = units.map(u=>({
+  range:Number(document.getElementById("range"+u.team+u.id).value),
+  hp:Number(document.getElementById("hp"+u.team+u.id).value),
+  maxHp:Number(document.getElementById("hp"+u.team+u.id).value),
+  attack:document.getElementById("atk"+u.team+u.id).value,
+  defense:document.getElementById("def"+u.team+u.id).value,
+  weapon:document.getElementById("wp"+u.team+u.id).value,
+  cover:document.getElementById("cv"+u.team+u.id).value
+ }));
+ alert("保存完了");
+}
+
+function start(){
+ running=true; paused=false; fast=false;
+ init();
+ applySaved();
+ loop();
+}
+
+function pause(){paused=!paused;}
+function skip(){fast=true;}
 
 function distance(a,b){return Math.hypot(a.x-b.x,a.y-b.y);}
 
@@ -81,7 +122,12 @@ function update(){
     u.lastAttack=performance.now();
 
     bullets.push({
-      x:u.x,y:u.y,target:t,owner:u,speed:5
+     x:u.x,y:u.y,
+     startX:u.x,startY:u.y,
+     target:t,
+     owner:u,
+     speed:5,
+     born:performance.now()
     });
    }
 
@@ -95,6 +141,7 @@ function update(){
 
  // 弾処理
  for(let b of bullets){
+
   if(b.target.dead) continue;
 
   let dx=b.target.x-b.x, dy=b.target.y-b.y;
@@ -102,27 +149,38 @@ function update(){
   b.x+=dx/len*b.speed;
   b.y+=dy/len*b.speed;
 
+  // 命中
   if(len<6){
     if(Math.random()>0.1){
       let mult=damageTable[b.owner.attack][b.target.defense];
       let dmg=2*mult;
       b.target.hp-=dmg;
-
       popups.push({x:b.target.x,y:b.target.y,text:"-"+dmg,life:50});
-
       if(b.target.hp<=0) b.target.dead=true;
-
     }else{
       popups.push({x:b.target.x,y:b.target.y,text:"miss",life:50});
     }
     b.hit=true;
   }
+
+  // 射程+100超え
+  let distFromStart=Math.hypot(b.x-b.startX,b.y-b.startY);
+  if(distFromStart > b.owner.range + 100){
+    b.hit=true;
+  }
+
+  // 発射者死亡後1秒
+  if(b.owner.dead && performance.now()-b.born > 1000){
+    b.hit=true;
+  }
  }
+
  bullets=bullets.filter(b=>!b.hit);
 }
 
 function endGame(team){
  running=false;
+ bullets=[];
  popups=[];
  setTimeout(()=>{
   document.getElementById("winner").innerText=team+" 勝利";
@@ -140,14 +198,12 @@ function draw(){
   ctx.arc(u.x,u.y,10,0,Math.PI*2);
   ctx.fill();
 
-  // 番号
   ctx.fillStyle="white";
-  ctx.font="10px sans-serif";
   ctx.fillText(u.id,u.x-3,u.y+3);
 
-  // HPバー
   let r=u.hp/u.maxHp;
   let col="green"; if(r<0.5) col="orange"; if(r<0.2) col="red";
+
   ctx.fillStyle="#ccc"; ctx.fillRect(u.x-15,u.y-20,30,4);
   ctx.fillStyle=col; ctx.fillRect(u.x-15,u.y-20,30*r,4);
 
@@ -171,7 +227,6 @@ function draw(){
   p.y-=0.5; p.life--;
  }
  ctx.globalAlpha=1;
-
  popups=popups.filter(p=>p.life>0);
 }
 
@@ -185,30 +240,36 @@ function loop(){
  requestAnimationFrame(loop);
 }
 
-function start(){running=true;paused=false;fast=false;init();loop();}
-function pause(){paused=!paused;}
-function skip(){fast=true;}
-
 // UI
 function buildUI(){
- let panel=document.getElementById("right");
+ let panel=document.getElementById("panel");
  panel.innerHTML="";
 
- units.forEach((u,i)=>{
+ let ordered=[
+  ...units.filter(u=>u.team==="red"),
+  ...units.filter(u=>u.team==="blue")
+ ];
+
+ ordered.forEach(u=>{
   let div=document.createElement("div");
   div.className="unitBox";
 
   div.innerHTML=`
   <b>${u.team}${u.id}</b><br>
-  射程:<input type="number" value="${u.range}" onchange="units[${i}].range=this.value"><br>
-  HP:<input type="number" value="${u.hp}" onchange="units[${i}].hp=this.value"><br>
-  攻撃:
-  <select onchange="units[${i}].attack=this.value">
-    ${Object.keys(damageTable).map(a=>`<option ${a===u.attack?"selected":""}>${a}</option>`).join("")}
+  射程:<input id="range${u.team}${u.id}" value="${u.range}"><br>
+  HP:<input id="hp${u.team}${u.id}" value="${u.hp}"><br>
+  攻撃:<select id="atk${u.team}${u.id}">
+    ${Object.keys(damageTable).map(a=>`<option>${a}</option>`)}
   </select><br>
-  防御:
-  <select onchange="units[${i}].defense=this.value">
-    ${Object.values(damageTable["ドカン"]).map((_,i)=>["かるーい","おもーい","まぜまぜ","ふしぎー","もちもち"][i]).map(d=>`<option ${d===u.defense?"selected":""}>${d}</option>`).join("")}
+  防御:<select id="def${u.team}${u.id}">
+    ${["かるーい","おもーい","まぜまぜ","ふしぎー","もちもち"].map(d=>`<option>${d}</option>`)}
+  </select><br>
+  武器:<select id="wp${u.team}${u.id}">
+    <option>なし</option>
+  </select><br>
+  遮蔽:<select id="cv${u.team}${u.id}">
+    <option>使う</option>
+    <option selected>使わない</option>
   </select>
   `;
 
