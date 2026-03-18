@@ -9,13 +9,12 @@ const CENTER_Y = canvas.height / 2;
 
 let running = false;
 let paused = false;
-let initialized = false;
 
 const ATTACK_INTERVAL = 600;
 const SPEED = 1.5;
 
 let units = [];
-let unitTemplates = []; // ★ 追加：設定保持用
+let unitTemplates = []; // ★ 設定保存
 let openState = {};
 
 // ======================
@@ -72,8 +71,6 @@ class Unit {
     if (this.hp <= 0) {
       this.alive = false;
       return;
-    } else {
-      this.alive = true;
     }
 
     this.target = this.findClosestEnemy(units);
@@ -105,7 +102,6 @@ class Unit {
 
     if (this.target.hp <= 0) {
       this.target.alive = false;
-      this.target = null;
     }
   }
 
@@ -143,37 +139,42 @@ function getMultiplier(atk, def) {
 }
 
 // ======================
-// 初期生成（1回のみ）
+// 初期テンプレ生成
 // ======================
 function initUnits() {
-  if (initialized) return;
-  initialized = true;
+  if (unitTemplates.length > 0) return;
 
   for (let i = 0; i < 4; i++) {
-    units.push(new Unit("R"+i, "red", 50, 80 + i * 60));
-    units.push(new Unit("B"+i, "blue", 650, 80 + i * 60));
+    unitTemplates.push({
+      id: "R"+i,
+      team: "red",
+      x: 50,
+      y: 80 + i * 60,
+      hp: 30,
+      maxHp: 30,
+      range: 500,
+      attackType: "ドカン",
+      defenseType: "かるーい"
+    });
+
+    unitTemplates.push({
+      id: "B"+i,
+      team: "blue",
+      x: 650,
+      y: 80 + i * 60,
+      hp: 30,
+      maxHp: 30,
+      range: 500,
+      attackType: "ドカン",
+      defenseType: "かるーい"
+    });
   }
 }
 
 // ======================
-// ★ リセット（設定保持版）
+// リセット（templates→units）
 // ======================
 function resetBattle() {
-
-  // 最新状態をテンプレとして保存
-  unitTemplates = units.map(u => ({
-    id: u.id,
-    team: u.team,
-    x: u.x,
-    y: u.y,
-    hp: u.hp,
-    maxHp: u.maxHp,
-    range: u.range,
-    attackType: u.attackType,
-    defenseType: u.defenseType
-  }));
-
-  // テンプレから再生成
   units = unitTemplates.map(t => {
     const u = new Unit(t.id, t.team, t.x, t.y);
     u.hp = t.hp;
@@ -234,14 +235,6 @@ document.getElementById("pauseBtn").onclick = () => {
   paused = !paused;
 };
 
-document.getElementById("skipBtn").onclick = () => {
-  for (let i = 0; i < 2000; i++) {
-    units.forEach(u => u.update(units, performance.now()));
-    checkWin();
-    if (!running) break;
-  }
-};
-
 // ======================
 // パネルUI
 // ======================
@@ -249,51 +242,44 @@ function renderPanel() {
   const list = document.getElementById("entityList");
   list.innerHTML = "";
 
-  units.forEach(u => {
+  unitTemplates.forEach(t => {
+
     const div = document.createElement("div");
-    div.className = "entity";
 
     const header = document.createElement("div");
-    header.className = "entity-header";
-    header.textContent = `${u.id} (${u.team})`;
+    header.textContent = `${t.id} (${t.team})`;
 
     const body = document.createElement("div");
-    body.className = "entity-body";
-    body.style.display = openState[u.id] ? "block" : "none";
-
-    const container = document.createElement("div");
+    body.style.display = openState[t.id] ? "block" : "none";
 
     // X
-    const xLabel = document.createTextNode("x:");
     const xInput = document.createElement("input");
     xInput.type = "number";
-    xInput.value = Math.round(u.x - CENTER_X);
-    xInput.onchange = () => {
-      u.x = Number(xInput.value) + CENTER_X;
-    };
-
-    container.appendChild(xLabel);
-    container.appendChild(xInput);
-    container.appendChild(document.createElement("br"));
+    xInput.value = Math.round(t.x - CENTER_X);
+    xInput.onchange = () => t.x = Number(xInput.value) + CENTER_X;
 
     // Y
-    const yLabel = document.createTextNode("y:");
     const yInput = document.createElement("input");
     yInput.type = "number";
-    yInput.value = Math.round(u.y - CENTER_Y);
-    yInput.onchange = () => {
-      u.y = Number(yInput.value) + CENTER_Y;
+    yInput.value = Math.round(t.y - CENTER_Y);
+    yInput.onchange = () => t.y = Number(yInput.value) + CENTER_Y;
+
+    // HP
+    const hpInput = document.createElement("input");
+    hpInput.type = "number";
+    hpInput.value = t.hp;
+    hpInput.onchange = () => {
+      t.hp = Number(hpInput.value);
+      t.maxHp = t.hp;
     };
 
-    container.appendChild(yLabel);
-    container.appendChild(yInput);
-    container.appendChild(document.createElement("br"));
-
-    body.appendChild(container);
+    body.append("x:", xInput, document.createElement("br"));
+    body.append("y:", yInput, document.createElement("br"));
+    body.append("HP:", hpInput);
 
     header.onclick = () => {
-      openState[u.id] = !openState[u.id];
-      body.style.display = openState[u.id] ? "block" : "none";
+      openState[t.id] = !openState[t.id];
+      body.style.display = openState[t.id] ? "block" : "none";
     };
 
     div.appendChild(header);
@@ -306,5 +292,6 @@ function renderPanel() {
 // 初期実行
 // ======================
 initUnits();
+resetBattle();
 renderPanel();
 draw();
