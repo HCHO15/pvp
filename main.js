@@ -27,13 +27,11 @@ function getMultiplier(atk, def) {
 // ===== テンプレート =====
 const templates = [];
 
-// 初期テンプレート作成
 function initTemplates() {
   templates.length = 0;
 
   const spacing = 60;
 
-  // 赤
   for (let i = 0; i < 4; i++) {
     templates.push({
       team: "red",
@@ -47,7 +45,6 @@ function initTemplates() {
     });
   }
 
-  // 青
   for (let i = 0; i < 4; i++) {
     templates.push({
       team: "blue",
@@ -62,7 +59,7 @@ function initTemplates() {
   }
 }
 
-// ===== 実体ユニット =====
+// ===== 実体 =====
 let units = [];
 
 function initUnits() {
@@ -73,7 +70,7 @@ function initUnits() {
   }));
 }
 
-// ===== 最も近い敵 =====
+// ===== ターゲット =====
 function getNearestEnemy(unit) {
   let nearest = null;
   let minDist = Infinity;
@@ -157,7 +154,53 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
+// ===== UI =====
+function renderPanel() {
+  const panel = document.getElementById("panel");
+  panel.innerHTML = "";
+
+  templates.forEach((t, i) => {
+    const div = document.createElement("div");
+    div.className = "unit";
+
+    const header = document.createElement("div");
+    header.className = "header";
+    header.textContent = `${t.team} ${i}`;
+
+    const body = document.createElement("div");
+    body.className = "body";
+
+    header.onclick = () => {
+      body.style.display = body.style.display === "none" ? "block" : "none";
+    };
+
+    body.innerHTML = `
+      x: <input type="number" value="${t.x}" data-i="${i}" data-key="x"><br>
+      y: <input type="number" value="${t.y}" data-i="${i}" data-key="y"><br>
+      HP: <input type="number" value="${t.hp}" data-i="${i}" data-key="hp"><br>
+    `;
+
+    div.appendChild(header);
+    div.appendChild(body);
+    panel.appendChild(div);
+  });
+
+  panel.querySelectorAll("input").forEach(input => {
+    input.oninput = e => {
+      const i = e.target.dataset.i;
+      const key = e.target.dataset.key;
+      templates[i][key] = Number(e.target.value);
+    };
+  });
+}
+
+// ===== スタート =====
+document.getElementById("startBtn").onclick = () => {
+  initUnits();
+};
+
 // ===== 実行 =====
 initTemplates();
 initUnits();
+renderPanel();
 loop();
