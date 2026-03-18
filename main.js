@@ -1,7 +1,6 @@
 const canvas = document.getElementById("battleCanvas");
 const ctx = canvas.getContext("2d");
 
-// 解像度設定（見た目と内部を一致）
 canvas.width = 700;
 canvas.height = 400;
 
@@ -13,35 +12,74 @@ function toCanvasY(y) {
   return canvas.height / 2 - y;
 }
 
-// ユニット
+// ===== ユニット =====
 const units = [];
 
-// 初期配置
 function initUnits() {
   units.length = 0;
 
   const spacing = 60;
 
-  // 赤（左）
+  // 赤
   for (let i = 0; i < 4; i++) {
     units.push({
       team: "red",
       x: -300,
-      y: (i - 1.5) * spacing
+      y: (i - 1.5) * spacing,
+      speed: 10
     });
   }
 
-  // 青（右）
+  // 青
   for (let i = 0; i < 4; i++) {
     units.push({
       team: "blue",
       x: 300,
-      y: (i - 1.5) * spacing
+      y: (i - 1.5) * spacing,
+      speed: 10
     });
   }
 }
 
-// 描画
+// ===== 最も近い敵を取得 =====
+function getNearestEnemy(unit) {
+  let nearest = null;
+  let minDist = Infinity;
+
+  units.forEach(other => {
+    if (other.team !== unit.team) {
+      const dx = other.x - unit.x;
+      const dy = other.y - unit.y;
+      const dist = Math.hypot(dx, dy);
+
+      if (dist < minDist) {
+        minDist = dist;
+        nearest = other;
+      }
+    }
+  });
+
+  return nearest;
+}
+
+// ===== 移動処理 =====
+function update() {
+  units.forEach(u => {
+    const target = getNearestEnemy(u);
+    if (!target) return;
+
+    const dx = target.x - u.x;
+    const dy = target.y - u.y;
+    const dist = Math.hypot(dx, dy);
+
+    if (dist > 0) {
+      u.x += (dx / dist) * u.speed;
+      u.y += (dy / dist) * u.speed;
+    }
+  });
+}
+
+// ===== 描画 =====
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -53,6 +91,13 @@ function draw() {
   });
 }
 
-// 初期化
+// ===== ループ =====
+function loop() {
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ===== 実行 =====
 initUnits();
-draw();
+loop();
