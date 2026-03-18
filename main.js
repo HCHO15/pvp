@@ -1,7 +1,6 @@
 const canvas = document.getElementById("battleCanvas");
 const ctx = canvas.getContext("2d");
 
-// 解像度を実サイズに
 canvas.width = 700;
 canvas.height = 400;
 
@@ -12,7 +11,7 @@ let running = false;
 let paused = false;
 
 const ATTACK_INTERVAL = 600;
-const SPEED = 10;
+const SPEED = 1.5; // v1では少し調整
 
 class Unit {
   constructor(id, team, x, y) {
@@ -22,11 +21,16 @@ class Unit {
     this.y = y;
 
     this.hp = 30;
+    this.maxHp = 30;
     this.range = 500;
+
     this.attackType = "ドカン";
     this.defenseType = "かるーい";
 
     this.lastAttack = 0;
+    this.inRangeSince = null;
+
+    this.target = null;
     this.alive = true;
   }
 
@@ -34,15 +38,21 @@ class Unit {
     return Math.hypot(this.x - other.x, this.y - other.y);
   }
 
-  findTarget(units) {
+  findClosestEnemy(units) {
     let enemies = units.filter(u => u.team !== this.team && u.alive);
-    let inRange = enemies.filter(e => this.distanceTo(e) <= this.range);
+    if (enemies.length === 0) return null;
 
-    if (inRange.length === 0) return null;
-
-    return inRange.reduce((a, b) =>
+    return enemies.reduce((a, b) =>
       this.distanceTo(a) < this.distanceTo(b) ? a : b
     );
+  }
+
+  updateTarget(units) {
+    const newTarget = this.findClosestEnemy(units);
+    if (newTarget !== this.target) {
+      this.target = newTarget;
+      this.inRangeSince = null; // ターゲット変更でリセット
+    }
   }
 
   moveToward(target) {
@@ -56,42 +66,75 @@ class Unit {
     this.y += (dy / dist) * SPEED;
   }
 
-  attack(target, time) {
+  tryAttack(time) {
+    if (!this.target || !this.target.alive) return;
+
+    // 射程チェック
+    const dist = this.distanceTo(this.target);
+
+    if (dist > this.range) {
+      this.inRangeSince = null;
+      this.moveToward(this.target);
+      return;
+    }
+
+    // 射程内に入った瞬間を記録
+    if (this.inRangeSince === null) {
+      this.inRangeSince = time;
+      return;
+    }
+
+    // 0.6秒待機
+    if (time - this.inRangeSince < ATTACK_INTERVAL) {
+      return;
+    }
+
+    // 攻撃間隔
     if (time - this.lastAttack < ATTACK_INTERVAL) return;
 
     this.lastAttack = time;
 
-    if (Math.random() < 0.1) return; // ミス
+    // 10%ミス
+    if (Math.random() < 0.1) return;
 
-    let damage = 2 * getMultiplier(this.attackType, target.defenseType);
-    target.hp -= damage;
+    let damage = 2 * getMultiplier(this.attackType, this.target.defenseType);
 
-    if (target.hp <= 0) {
-      target.alive = false;
+    this.target.hp -= damage;
+
+    if (this.target.hp <= 0) {
+      this.target.alive = false;
+      this.target = null;
     }
   }
 
   update(units, time) {
     if (!this.alive) return;
 
-    let target = this.findTarget(units);
+    this.updateTarget(units);
 
-    if (!target) {
-      let enemy = units.find(u => u.team !== this.team && u.alive);
-      if (enemy) this.moveToward(enemy);
-      return;
-    }
+    if (!this.target) return;
 
-    this.attack(target, time);
+    this.tryAttack(time);
   }
 
   draw() {
     if (!this.alive) return;
 
+    // 本体
     ctx.beginPath();
     ctx.arc(this.x, this.y, 6, 0, Math.PI * 2);
     ctx.fillStyle = this.team === "red" ? "red" : "blue";
     ctx.fill();
+
+    // HPバー
+    const barWidth = 20;
+    const hpRatio = this.hp / this.maxHp;
+
+    ctx.fillStyle = "black";
+    ctx.fillRect(this.x - barWidth / 2, this.y - 12, barWidth, 3);
+
+    ctx.fillStyle = "lime";
+    ctx.fillRect(this.x - barWidth / 2, this.y - 12, barWidth * hpRatio, 3);
   }
 }
 
@@ -125,7 +168,6 @@ function initUnits() {
 // 描画
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
   units.forEach(u => u.draw());
 }
 
@@ -138,20 +180,21 @@ function loop(time) {
   }
 
   draw();
-
   checkWin();
 
   requestAnimationFrame(loop);
 }
 
-// 勝敗判定
+// 勝敗
 function checkWin() {
   let redAlive = units.some(u => u.team === "red" && u.alive);
   let blueAlive = units.some(u => u.team === "blue" && u.alive);
 
   if (!redAlive || !blueAlive) {
     running = false;
-    alert(redAlive ? "赤の勝ち！" : "青の勝ち！");
+    setTimeout(() => {
+      alert(redAlive ? "赤の勝ち！" : "青の勝ち！");
+    }, 50);
   }
 }
 
@@ -168,14 +211,14 @@ document.getElementById("pauseBtn").onclick = () => {
 };
 
 document.getElementById("skipBtn").onclick = () => {
-  for (let i = 0; i < 1000; i++) {
+  for (let i = 0; i < 2000; i++) {
     units.forEach(u => u.update(units, performance.now()));
     checkWin();
     if (!running) break;
   }
 };
 
-// サイドパネル
+// パネル
 function renderPanel() {
   const list = document.getElementById("entityList");
   list.innerHTML = "";
@@ -207,6 +250,5 @@ function renderPanel() {
   });
 }
 
-// 初期化
 initUnits();
 draw();
