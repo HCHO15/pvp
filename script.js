@@ -194,3 +194,8 @@ function skipGame() {
     safety++;
   }
 }
+
+// 初期表示（これを追加）
+createUnits();
+renderPanel();
+draw();
