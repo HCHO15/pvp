@@ -234,11 +234,113 @@ function renderPanel() {
     const body = document.createElement("div");
     body.className = "entity-body";
 
-    body.innerHTML = `
-      x: <input type="number" value="${Math.round(u.x - CENTER_X)}"><br>
-      y: <input type="number" value="${Math.round(u.y - CENTER_Y)}"><br>
-      HP: <input type="number" value="${u.hp}">
-    `;
+    // プルダウン生成関数
+    const createSelect = (options, value, onChange) => {
+      const select = document.createElement("select");
+      options.forEach(opt => {
+        const o = document.createElement("option");
+        o.value = opt;
+        o.textContent = opt;
+        if (opt === value) o.selected = true;
+        select.appendChild(o);
+      });
+      select.onchange = () => onChange(select.value);
+      return select;
+    };
+
+    // 射程
+    const rangeOptions = [];
+    for (let i = 350; i <= 800; i += 50) {
+      rangeOptions.push(i);
+    }
+
+    const container = document.createElement("div");
+
+    // X
+    const xInput = document.createElement("input");
+    xInput.type = "number";
+    xInput.value = Math.round(u.x - CENTER_X);
+    xInput.onchange = () => {
+      u.x = Number(xInput.value) + CENTER_X;
+    };
+
+    // Y
+    const yInput = document.createElement("input");
+    yInput.type = "number";
+    yInput.value = Math.round(u.y - CENTER_Y);
+    yInput.onchange = () => {
+      u.y = Number(yInput.value) + CENTER_Y;
+    };
+
+    container.append("x:", xInput, document.createElement("br"));
+    container.append("y:", yInput, document.createElement("br"));
+
+    // 射程
+    container.append("射程:");
+    container.append(
+      createSelect(rangeOptions, u.range, v => (u.range = Number(v)))
+    );
+    container.append(document.createElement("br"));
+
+    // 遮蔽
+    container.append("遮蔽:");
+    container.append(
+      createSelect(["使う", "使わない"], "使わない", v => {})
+    );
+    container.append(document.createElement("br"));
+
+    // 役割
+    container.append("役割:");
+    container.append(
+      createSelect(["アタック", "ディフェンス", "ヒール"], "アタック", v => {})
+    );
+    container.append(document.createElement("br"));
+
+    // 特殊挙動
+    container.append("特殊:");
+    container.append(createSelect(["なし"], "なし", v => {}));
+    container.append(document.createElement("br"));
+
+    // HP
+    const hpOptions = [];
+    for (let i = 10; i <= 50; i++) hpOptions.push(i);
+
+    container.append("HP:");
+    container.append(
+      createSelect(hpOptions, u.hp, v => {
+        u.hp = Number(v);
+        u.maxHp = Number(v);
+      })
+    );
+    container.append(document.createElement("br"));
+
+    // 武器
+    container.append("武器:");
+    container.append(createSelect(["なし"], "なし", v => {}));
+    container.append(document.createElement("br"));
+
+    // 攻撃
+    container.append("攻撃:");
+    container.append(
+      createSelect(
+        ["ドカン", "ズバッ", "グルル", "ブルブル", "バラバラ"],
+        u.attackType,
+        v => (u.attackType = v)
+      )
+    );
+    container.append(document.createElement("br"));
+
+    // 防御
+    container.append("防御:");
+    container.append(
+      createSelect(
+        ["かるーい", "おもーい", "ふしぎー", "もちもち", "まぜまぜ"],
+        u.defenseType,
+        v => (u.defenseType = v)
+      )
+    );
+
+    body.appendChild(container);
 
     header.onclick = () => {
       body.style.display = body.style.display === "none" ? "block" : "none";
