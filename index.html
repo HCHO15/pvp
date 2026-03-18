@@ -134,10 +134,35 @@ function draw(){
 
   for(let u of units){
     if(u.dead) continue;
+
+    // 点描画
     ctx.beginPath();
     ctx.fillStyle = u.team==="red"?"red":"blue";
     ctx.arc(u.x,u.y,8,0,Math.PI*2);
     ctx.fill();
+
+    // --- HP表示 ---
+    const text = "HP:" + Math.ceil(u.hp);
+
+    ctx.font = "12px sans-serif";
+    const textWidth = ctx.measureText(text).width;
+
+    // 背景
+    ctx.fillStyle = "white";
+    ctx.fillRect(
+      u.x - textWidth/2 - 2,
+      u.y - 20,
+      textWidth + 4,
+      14
+    );
+
+    // 文字
+    ctx.fillStyle = "black";
+    ctx.fillText(
+      text,
+      u.x - textWidth/2,
+      u.y - 8
+    );
   }
 }
 
