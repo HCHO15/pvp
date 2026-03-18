@@ -35,6 +35,8 @@ let units=[], bullets=[], popups=[];
 let savedData=[];
 let running=false, paused=false, fast=false;
 
+const RANGE_OPTIONS = [350,450,550,650,750,850];
+
 const defaultData = () => ({
  range:400, hp:30, attack:"ドカン",
  defense:"かるーい", weapon:"なし", cover:"使わない"
@@ -50,10 +52,13 @@ const damageTable = {
 
 class Unit{
  constructor(team,x,y,id,data){
-  this.team=team; this.id=id;
+  this.team=team;
+  this.id=id;
   this.x=x; this.y=y;
 
-  this.range=data.range;
+  this.displayRange=data.range;
+  this.range=data.range * 0.75;
+
   this.hp=data.hp;
   this.maxHp=data.hp;
 
@@ -82,8 +87,8 @@ function createUnits(){
 function saveStatus(){
  savedData=[];
  for(let i=0;i<8;i++){
-  let team = i<4?"red":"blue";
-  let id = i<4?i+1:i-3;
+  let team=i<4?"red":"blue";
+  let id=i<4?i+1:i-3;
 
   savedData.push({
    range:Number(document.getElementById(`range${team}${id}`).value),
@@ -104,8 +109,11 @@ function resetStatus(){
 }
 
 function start(){
- running=true; paused=false; fast=false;
- bullets=[]; popups=[];
+ running=true;
+ paused=false;
+ fast=false;
+ bullets=[];
+ popups=[];
  document.getElementById("winner").innerText="";
  createUnits();
  loop();
@@ -158,9 +166,9 @@ function update(){
   b.x+=b.dx*5;
   b.y+=b.dy*5;
 
-  // 命中判定（円判定）
   for(let t of units){
     if(t.dead || t.team===b.owner.team) continue;
+
     if(distance(b,t)<8){
 
       if(Math.random()>0.1){
@@ -178,11 +186,9 @@ function update(){
     }
   }
 
-  // 射程+100
   let d=Math.hypot(b.x-b.startX,b.y-b.startY);
   if(d > b.range + 100) b.hit=true;
 
-  // 発射者死亡1秒後
   if(b.owner.dead && performance.now()-b.born > 1000) b.hit=true;
  }
 
@@ -191,7 +197,8 @@ function update(){
 
 function endGame(team){
  running=false;
- bullets=[]; popups=[];
+ bullets=[];
+ popups=[];
  setTimeout(()=>{
   document.getElementById("winner").innerText=team+" 勝利";
  },800);
@@ -214,8 +221,11 @@ function draw(){
   let r=u.hp/u.maxHp;
   let col="green"; if(r<0.5) col="orange"; if(r<0.2) col="red";
 
-  ctx.fillStyle="#ccc"; ctx.fillRect(u.x-15,u.y-20,30,4);
-  ctx.fillStyle=col; ctx.fillRect(u.x-15,u.y-20,30*r,4);
+  ctx.fillStyle="#ccc";
+  ctx.fillRect(u.x-15,u.y-20,30,4);
+
+  ctx.fillStyle=col;
+  ctx.fillRect(u.x-15,u.y-20,30*r,4);
 
   ctx.fillStyle="black";
   ctx.fillText(Math.ceil(u.hp),u.x-6,u.y-25);
@@ -231,7 +241,8 @@ function draw(){
  for(let p of popups){
   ctx.globalAlpha=p.life/50;
   ctx.fillText(p.text,p.x,p.y);
-  p.y-=0.5; p.life--;
+  p.y-=0.5;
+  p.life--;
  }
  ctx.globalAlpha=1;
 
@@ -240,10 +251,12 @@ function draw(){
 
 function loop(){
  if(!running) return;
+
  if(!paused){
   let step=fast?20:1;
   for(let i=0;i<step;i++) update();
  }
+
  draw();
  requestAnimationFrame(loop);
 }
@@ -262,22 +275,37 @@ function buildUI(){
 
   div.innerHTML=`
   <b>${team}${id}</b><br>
-  射程:<input id="range${team}${id}" value="${d.range}"><br>
+
+  射程:
+  <select id="range${team}${id}">
+    ${RANGE_OPTIONS.map(v=>`<option ${v==d.range?"selected":""}>${v}</option>`).join("")}
+  </select><br>
+
   HP:<input id="hp${team}${id}" value="${d.hp}"><br>
-  攻撃:<select id="atk${team}${id}">
-    ${Object.keys(damageTable).map(a=>`<option ${a===d.attack?"selected":""}>${a}</option>`)}
+
+  攻撃:
+  <select id="atk${team}${id}">
+    ${Object.keys(damageTable).map(a=>`<option ${a===d.attack?"selected":""}>${a}</option>`).join("")}
   </select><br>
-  防御:<select id="def${team}${id}">
-    ${["かるーい","おもーい","まぜまぜ","ふしぎー","もちもち"].map(a=>`<option ${a===d.defense?"selected":""}>${a}</option>`)}
+
+  防御:
+  <select id="def${team}${id}">
+    ${["かるーい","おもーい","まぜまぜ","ふしぎー","もちもち"]
+      .map(a=>`<option ${a===d.defense?"selected":""}>${a}</option>`).join("")}
   </select><br>
-  武器:<select id="wp${team}${id}">
-    <option>なし</option>
+
+  武器:
+  <select id="wp${team}${id}">
+    <option ${d.weapon==="なし"?"selected":""}>なし</option>
   </select><br>
-  遮蔽:<select id="cv${team}${id}">
+
+  遮蔽:
+  <select id="cv${team}${id}">
     <option ${d.cover==="使う"?"selected":""}>使う</option>
     <option ${d.cover==="使わない"?"selected":""}>使わない</option>
   </select>
   `;
+
   panel.appendChild(div);
  }
 }
