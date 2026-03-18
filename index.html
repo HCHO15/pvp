@@ -13,8 +13,6 @@ body {
 }
 #right {
   width: 30%;
-  overflow-y: scroll;
-  height: 95vh;
 }
 canvas {
   border: 1px solid black;
@@ -22,10 +20,9 @@ canvas {
 button {
   margin: 5px;
 }
-.unit {
-  border: 1px solid #ccc;
-  margin: 5px;
-  padding: 5px;
+#winner {
+  font-size: 20px;
+  color: red;
 }
 </style>
 </head>
@@ -36,10 +33,11 @@ button {
   <button onclick="start()">スタート</button>
   <button onclick="pause()">一時停止/解除</button>
   <button onclick="skip()">スキップ</button>
+  <div id="winner"></div>
   <canvas id="canvas" width="700" height="400"></canvas>
 </div>
 
-<div id="right" id="panel"></div>
+<div id="right"></div>
 
 <script>
 
@@ -50,7 +48,7 @@ let running = false;
 let paused = false;
 let fast = false;
 
-const RANGE_VALUES = Array.from({length:10},(_,i)=>350+i*50);
+let popups = [];
 
 const damageTable = {
  "ドカン": {"かるーい":2,"おもーい":1,"まぜまぜ":1,"ふしぎー":0.5,"もちもち":0.5},
@@ -65,12 +63,12 @@ class Unit {
     this.team = team;
     this.x = x;
     this.y = y;
+    this.maxHp = 30;
     this.hp = 30;
     this.range = 400;
     this.attack = "ドカン";
     this.defense = "かるーい";
     this.lastAttack = 0;
-    this.target = null;
     this.dead = false;
   }
 }
@@ -83,42 +81,53 @@ function init(){
     units.push(new Unit("red",50,80*i+50));
     units.push(new Unit("blue",650,80*i+50));
   }
+  document.getElementById("winner").innerText = "";
 }
-init();
 
 function distance(a,b){
   return Math.hypot(a.x-b.x,a.y-b.y);
 }
 
-function update(dt){
+function update(){
 
   for(let u of units){
     if(u.dead) continue;
 
     let enemies = units.filter(e=>e.team!==u.team && !e.dead);
 
-    if(enemies.length===0) return;
+    if(enemies.length===0){
+      declareWinner(u.team);
+      return;
+    }
 
-    // ターゲット選択
     let inRange = enemies.filter(e=>distance(u,e)<=u.range);
 
     if(inRange.length>0){
-      u.target = inRange.sort((a,b)=>distance(u,a)-distance(u,b))[0];
+      let target = inRange.sort((a,b)=>distance(u,a)-distance(u,b))[0];
 
-      // 攻撃
       if(performance.now()-u.lastAttack>600){
         u.lastAttack = performance.now();
 
         if(Math.random()>0.1){
-          let mult = damageTable[u.attack][u.target.defense];
-          let dmg = 2*mult;
-          u.target.hp -= dmg;
-          if(u.target.hp<=0) u.target.dead=true;
+          let mult = damageTable[u.attack][target.defense];
+          let dmg = 2 * mult;
+
+          target.hp -= dmg;
+
+          popups.push({
+            x: target.x,
+            y: target.y,
+            text: "-" + dmg,
+            life: 50
+          });
+
+          if(target.hp<=0){
+            target.dead = true;
+          }
         }
       }
 
     }else{
-      // 移動
       let nearest = enemies.sort((a,b)=>distance(u,a)-distance(u,b))[0];
       let dx = nearest.x - u.x;
       let dy = nearest.y - u.y;
@@ -129,51 +138,65 @@ function update(dt){
   }
 }
 
+function declareWinner(team){
+  running = false;
+  document.getElementById("winner").innerText = team + " 勝利";
+}
+
 function draw(){
   ctx.clearRect(0,0,canvas.width,canvas.height);
 
   for(let u of units){
     if(u.dead) continue;
 
-    // 点描画
+    // 本体
     ctx.beginPath();
     ctx.fillStyle = u.team==="red"?"red":"blue";
     ctx.arc(u.x,u.y,8,0,Math.PI*2);
     ctx.fill();
 
-    // --- HP表示 ---
-    const text = "HP:" + Math.ceil(u.hp);
+    // HPバー
+    let ratio = u.hp / u.maxHp;
+    let color = "green";
+    if(ratio < 0.5) color = "orange";
+    if(ratio < 0.2) color = "red";
 
-    ctx.font = "12px sans-serif";
-    const textWidth = ctx.measureText(text).width;
+    ctx.fillStyle = "#ccc";
+    ctx.fillRect(u.x-15,u.y-18,30,4);
 
-    // 背景
-    ctx.fillStyle = "white";
-    ctx.fillRect(
-      u.x - textWidth/2 - 2,
-      u.y - 20,
-      textWidth + 4,
-      14
-    );
+    ctx.fillStyle = color;
+    ctx.fillRect(u.x-15,u.y-18,30*ratio,4);
 
-    // 文字
+    // HP数値
     ctx.fillStyle = "black";
-    ctx.fillText(
-      text,
-      u.x - textWidth/2,
-      u.y - 8
-    );
+    ctx.font = "10px sans-serif";
+    ctx.fillText(Math.ceil(u.hp), u.x-6, u.y-22);
   }
+
+  // ポップアップ
+  for(let p of popups){
+    ctx.globalAlpha = p.life/50;
+    ctx.fillStyle = "black";
+    ctx.font = "12px sans-serif";
+    ctx.fillText(p.text,p.x,p.y);
+
+    p.y -= 0.5;
+    p.life--;
+  }
+  ctx.globalAlpha = 1;
+
+  popups = popups.filter(p=>p.life>0);
 }
 
 function loop(){
   if(!running) return;
+
   if(!paused){
     let step = fast?20:1;
     for(let i=0;i<step;i++) update();
   }
-  draw();
 
+  draw();
   requestAnimationFrame(loop);
 }
 
