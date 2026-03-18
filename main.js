@@ -241,7 +241,6 @@ function checkWin() {
 
 // UI
 document.getElementById("startBtn").onclick = () => {
-  initUnits();
   running = true;
   paused = false;
   requestAnimationFrame(loop);
