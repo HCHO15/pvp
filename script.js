@@ -176,7 +176,6 @@ function loop(timestamp) {
 }
 
 function startGame() {
-  createUnits();
   running = true;
   paused = false;
   lastTime = performance.now();
