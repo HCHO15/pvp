@@ -107,15 +107,56 @@ class Unit {
     }
   }
 
-  update(units, time) {
-    if (!this.alive) return;
+update(units, time) {
+  if (!this.alive) return;
 
-    this.updateTarget(units);
-
-    if (!this.target) return;
-
-    this.tryAttack(time);
+  // HPが外部変更された場合の復帰
+  if (this.hp > 0 && !this.alive) {
+    this.alive = true;
   }
+
+  if (this.hp <= 0) {
+    this.alive = false;
+    return;
+  }
+
+  // 毎フレームターゲット更新（重要）
+  this.target = this.findClosestEnemy(units);
+
+  if (!this.target) return;
+
+  const dist = this.distanceTo(this.target);
+
+  // 射程外なら移動
+  if (dist > this.range) {
+    this.inRangeSince = null;
+    this.moveToward(this.target);
+    return;
+  }
+
+  // 射程内
+  if (this.inRangeSince === null) {
+    this.inRangeSince = time;
+    return;
+  }
+
+  if (time - this.inRangeSince < ATTACK_INTERVAL) return;
+
+  if (time - this.lastAttack < ATTACK_INTERVAL) return;
+
+  this.lastAttack = time;
+
+  if (Math.random() < 0.1) return;
+
+  let damage = 2 * getMultiplier(this.attackType, this.target.defenseType);
+
+  this.target.hp -= damage;
+
+  if (this.target.hp <= 0) {
+    this.target.alive = false;
+    this.target = null;
+  }
+}
 
   draw() {
     if (!this.alive) return;
@@ -278,8 +319,10 @@ function renderPanel() {
     // 射程
     container.append("射程:");
     container.append(
-      createSelect(rangeOptions, u.range, v => (u.range = Number(v)))
-    );
+      createSelect(rangeOptions, u.range, v => {
+ 　　　 u.range = Number(v);
+ 　　　 u.inRangeSince = null; // 再判定させる
+　　});
     container.append(document.createElement("br"));
 
     // 遮蔽
@@ -305,14 +348,16 @@ function renderPanel() {
     const hpOptions = [];
     for (let i = 10; i <= 50; i++) hpOptions.push(i);
 
-    container.append("HP:");
     container.append(
-      createSelect(hpOptions, u.hp, v => {
-        u.hp = Number(v);
-        u.maxHp = Number(v);
-      })
-    );
-    container.append(document.createElement("br"));
+  　　createSelect(hpOptions, u.hp, v => {
+    　　u.hp = Number(v);
+   　　 u.maxHp = Number(v);
+
+    　　if (u.hp > 0) {
+      　　u.alive = true;
+   　　 }
+  　　})
+　　);
 
     // 武器
     container.append("武器:");
@@ -323,11 +368,13 @@ function renderPanel() {
     container.append("攻撃:");
     container.append(
       createSelect(
-        ["ドカン", "ズバッ", "グルル", "ブルブル", "バラバラ"],
-        u.attackType,
-        v => (u.attackType = v)
-      )
-    );
+ 　　　　 ["ドカン", "ズバッ", "グルル", "ブルブル", "バラバラ"],
+ 　　　　 u.attackType,
+ 　　　　 v => {
+   　　　　 u.attackType = v;
+    　　　　console.log(u.id, "attack:", v);
+　　　　  }
+　　　　);
     container.append(document.createElement("br"));
 
     // 防御
