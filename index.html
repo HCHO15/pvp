@@ -320,7 +320,7 @@
 <body>
 <div class="page">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-    <h1 style="margin-bottom:0;">⚔️ 戦術対抗戦 編成アドバイザー　test </h1>
+    <h1 style="margin-bottom:0;">⚔️ 戦術対抗戦 編成アドバイザー</h1>
     
   </div>
   <div class="tabs">
@@ -628,13 +628,6 @@ const RANGE_NUM = {
   '650':4, '650🛡':4, '750':5, '750🛡':5, '850':6, '850🛡':6,
   'ツルギ':0, 'アカネ':0, 'シュン属':0, 'ドヒナ属':0
 };
-// 射程数値 → W（攻撃重み）: 350→0.2, 850→0.8
-function rangeToW(rangeStr) {
-  const n = RANGE_NUM[rangeStr] ?? 3;
-  if (n === 0) return 0.5; // 特殊射程は中立
-  // n: 1(350)〜6(850) → 0.2〜0.8 線形補間
-  return 0.2 + (n - 1) / 5 * 0.6;
-}
 
 // ---- 遮蔽設定（スロットごとに射程グループ別でON/OFF） ----
 // shieldCfg[slotN][rangeGroup] = true(遮蔽必須) / false(遮蔽不問)
@@ -650,16 +643,6 @@ function setShieldRequired(slotN, rangeBase, val) {
   try { localStorage.setItem('pvp_shield', JSON.stringify(shieldCfg)); } catch(e){}
 }
 
-// ---- 重み付き幾何平均スコア計算 ----
-// dAtk: 対面Dの攻撃属性, dDef: 対面Dの防御属性
-// isTarget: このAスロットが直接攻撃対象として指定されているか
-function calcStudentScore(student, dAtk, dDef, isTarget) {
-  const W = isTarget ? 0.15 : rangeToW(student.range);
-  const atkScore = dDef ? (DMG[student.atk]?.[dDef] ?? 1.0) : 1.0;
-  const defRaw   = dAtk ? (DMG[dAtk]?.[student.def] ?? 1.0) : 1.0;
-  const defScore = 1 / defRaw;
-  return Math.pow(atkScore, W) * Math.pow(defScore, 1 - W);
-}
 
 // ---- 射程フィルタ＋一致度判定 ----
 // 戻り値: 'full'（完全一致）| 'partial'（数値一致・🛡違い・OFF時のみ）| false（除外）
@@ -786,8 +769,6 @@ function defTag(v){
   const c=v<=0.5?'def-05':v<=1?'def-1':'def-hi';
   return `<span class="mt ${c}">×${v}</span>`;
 }
-function dmgLabel(prefix){ return cfg.showDmg ? prefix : ''; }
-
 /* ターゲット選択肢生成：自分以外のスロット */
 function targetOptions(side, n, savedVal=''){
   const oppSide = side==='a' ? 'd' : 'a';
@@ -876,8 +857,8 @@ function comboRowHtml(combos){
   return `<div class="combo-inline-list">${combos.map((c,i)=>{
     const r=i+1;
     const scores=[
-      c.atkScore!==null&&cfg.showDmg?`<span class="sc">${dmgLabel('攻')}${atkTag(c.atkScore)}</span>`:'',
-      c.defRaw  !==null&&cfg.showDmg?`<span class="sc">${dmgLabel('被')}${defTag(c.defRaw)}</span>`:'',
+      c.atkScore!==null&&cfg.showDmg?`<span class="sc">${atkTag(c.atkScore)}</span>`:'',
+      c.defRaw  !==null&&cfg.showDmg?`<span class="sc">${defTag(c.defRaw)}</span>`:'',
     ].join('');
     return `<div class="combo-inline ${r===1?'rank-1':''}">
       <div class="rank-badge ${r===1?'rb-1':'rb-2'}">${r}</div>
@@ -1048,14 +1029,6 @@ function onSel(n,field,val){
   if(si) si.value = '';
 }
 
-function toggleExclude(){
-  excludeGreen=!excludeGreen;
-  document.getElementById('toggle-btn').classList.toggle('off',!excludeGreen);
-  document.getElementById('toggle-label').textContent=
-    excludeGreen?'分解 / 複合装甲 を考慮しない（ON）':'分解 / 複合装甲 を考慮する';
-  renderResults();
-}
-
 /* ===== 射程ルールメモ ===== */
 function cbGroupHtml(prefix,n){
   return RANGES.map(r=>{
@@ -1187,7 +1160,6 @@ function saveRule(){
 function copyRule(id) {
   var rule = rules.find(function(r){ return r.id === id; });
   if (!rule) return;
-  var SLOTS = [1,2,3,4];
   // 行2: ルール名\tA1射程\t...\tD4射程
   var row2 = [rule.name];
   SLOTS.forEach(function(n){ row2.push((rule.a[n]||[]).join(',')); });
@@ -2058,7 +2030,7 @@ function loadFromSheet() {
   if (listEl) listEl.innerHTML = '';
 
   // みん辞書 GAS WebApp URL（固定）
-  var gasUrl = 'https://script.google.com/macros/s/AKfycbyl7PnYZGsHhlpO6gI5mOUHUjdMFn7S7myDEnJsFW7DYtoujLIPQC3zbwjqN6W9OveaMA/exec';
+  var gasUrl = 'https://script.google.com/macros/s/AKfycbzdCiRqUkRIFZIknfvmtOEqNAtjbhSXZnkUqsBnKKLALZEA8ZpOYwbHw3oSDrHQdumSVQ/exec';
 
   fetch(gasUrl)
     .then(function(res) {
